@@ -48,9 +48,15 @@ Select the board by Tools->Board->ATtiny2313/4313, and the speed Tools->Micro->A
 
 Set the programmer's TARGET jumper to ON and the POWER jumper to 5V so that it can provide power to the ATtiny microcontroller.
 
-Use in-system programmer (ISP/ICSP) output.  Make a cable that can connect the ATtiny (target) to the programmer, cf. the [wiring from the programmer](icsp-cable.png) and how I [split out a 10-wire cable](icsp-wire-split.jpg).
+Use in-system programmer (ISP/ICSP) output.  Make a cable that can connect the ATtiny (target) to the programmer, cf. the [wiring from the programmer](icsp-cable.png) and how I [split out a 10-wire cable](icsp-wire-split.png), [soldered stiff, coloured wires](cable-heatshrink.jpg) to it, and [finished it up](cable-finished.jpg).
 
+Check that communication works:
 
+    $ avrdude -c avrispmkii -p t2313
+    avrdude: AVR device initialized and ready to accept instructions
+    Reading | ################################################## | 100% 0.00s
+    avrdude: Device signature = 0x1e910a (probably t2313)
+    avrdude: safemode: Fuses OK (E:FF, H:DF, L:64)
 
 The [datasheet](http://ww1.microchip.com/downloads/en/devicedoc/8246s.pdf).
 
