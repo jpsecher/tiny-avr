@@ -30,6 +30,19 @@ Check that communication works:
 
 The LED on the programmer should change from orange to green light.
 
+## AVR compiler
+
+Make sure the XCode command-line tools are installed:
+
+    $ xcode-select --install
+
+Install AVR tools:
+
+    $ brew tap osx-cross/avr
+    $ brew -v install avr-gcc
+
+It takes a looong time to compile.
+
 ## Arduino IDE 1.8
 
     $ brew cask install arduino
@@ -69,7 +82,7 @@ Check that communication works:
     avrdude: Device signature = 0x1e910a (probably t2313)
     avrdude: safemode: Fuses OK (E:FF, H:DF, L:64)
 
-Make it blink:
+Make it blink with Aduino IDE:
 
     #define PIN_16 13
     void setup() {
@@ -81,6 +94,10 @@ Make it blink:
       digitalWrite(PIN_16, LOW);
       delay(500);
     }
+
+Change to pure C++: https://electronut.in/getting-started-with-attiny85-avr-programming/
+
+
 
 The [datasheet](http://ww1.microchip.com/downloads/en/devicedoc/8246s.pdf).
 
