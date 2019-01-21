@@ -51,6 +51,10 @@ Load the new boards by Tools->Board->BoardsManager and search for `attiny`.  Cli
 
 ## ATtiny2313A
 
+Change the speed to 8MHz:
+
+    $ avrdude -p t2313 -U lfuse:w:0xE4:m
+
 Select the board by Tools->Board->ATtiny2313/4313, and the speed Tools->Micro->ATtiny2313@8MHz.
 
 Set the programmer's TARGET jumper to ON and the POWER jumper to 5V so that it can provide power to the ATtiny microcontroller.
@@ -73,11 +77,10 @@ Make it blink:
     }
     void loop() {
       digitalWrite(PIN_16, HIGH);
-      delay(1000);
+      delay(500);
       digitalWrite(PIN_16, LOW);
-      delay(1000);
+      delay(500);
     }
-
 
 The [datasheet](http://ww1.microchip.com/downloads/en/devicedoc/8246s.pdf).
 
@@ -90,42 +93,16 @@ The [datasheet](http://ww1.microchip.com/downloads/en/DeviceDoc/doc8126.pdf).
 
 The [datasheet](http://ww1.microchip.com/downloads/en/DeviceDoc/atmel-8127-avr-8-bit-microcontroller-attiny4-attiny5-attiny9-attiny10_datasheet.pdf).
 
+## MIDI receive
+
+- Install MIDI Library from Forty Seven Effects in Arduino IDE.
+- https://www.instructables.com/id/Send-and-Receive-MIDI-with-Arduino/
+
+
 ## Notes
 
 To get rid of an old installation:
 
     $ brew cask uninstall arduino
     $ rm -rf ~/Library/Arduino15
-
-AVRDude from source:
-
-    $ svn co svn://svn.savannah.nongnu.org/avrdude/trunk avrdude
-    $ cd avrdude/avrdude
-
-Patch:
-
-    --- stk500v2.c  (revision 1429)
-    +++ stk500v2.c  (working copy)
-    @@ -1633,7 +1633,7 @@
-         PDATA(pgm)->pgmtype = PGMTYPE_AVRISP_MKII;
-         pgm->set_sck_period = stk500v2_set_sck_period_mk2;
-         pgm->fd.usb.max_xfer = USBDEV_MAX_XFER_MKII;
-    -    pgm->fd.usb.rep = USBDEV_BULK_EP_READ_MKII;
-    +    pgm->fd.usb.rep = 0;
-         pgm->fd.usb.wep = USBDEV_BULK_EP_WRITE_MKII;
-         pgm->fd.usb.eep = 0;           /* no seperate EP for events */
-     #else
-
-Build:
-
-    $ ./bootstrap
-    $ ./configure
-    $ make
-
-
-- http://svn.savannah.gnu.org/viewvc/avrdude/trunk/avrdude/
-
-Arduino IDE upload problems:
-
-- https://www.avrfreaks.net/forum/olimex-isp-mk2-error-mac-osx-109
 
