@@ -1,10 +1,23 @@
+MCU = ATTINY13A
+
+## Fuses, see http://www.engbedded.com/fusecalc
+
+ifeq ($(MCU), ATTINY13A)
+DEVICE = attiny13a
+SHORT_DEVICE = t13
+FUSES = -U lfuse:w:0x7A:m -U hfuse:w:0xFF:m
+CLOCK = 8000000
+endif
+
+ifeq ($(MCU), ATTINY2313A)
 DEVICE = attiny2313a
 SHORT_DEVICE = t2313
+FUSES = -U lfuse:w:0xE4:m -U hfuse:w:0xdf:m -U efuse:w:0xff:m
 CLOCK = 8000000
+endif
+
 PROGRAMMER = -c avrispmkii
 OBJECTS = main.o
-# see http://www.engbedded.com/fusecalc
-FUSES = -U lfuse:w:0xE4:m -U hfuse:w:0xdf:m -U efuse:w:0xff:m
 AVRDUDE = avrdude $(PROGRAMMER) -p $(SHORT_DEVICE)
 COMPILE = avr-gcc -Wall -Os -DF_CPU=$(CLOCK) -mmcu=$(DEVICE)
 
