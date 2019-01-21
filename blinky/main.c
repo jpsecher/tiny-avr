@@ -1,14 +1,31 @@
 #include <avr/io.h>
 #include <util/delay.h>
 
+#define INLINE static inline
+
+INLINE void pin_as_output (uint8_t pin);
+INLINE void pin_on (uint8_t pin);
+INLINE void pin_off (uint8_t pin);
+
 int main () {
-  // set PB4 to be output
-	DDRB = 0b00010000;
+	pin_as_output(PB4);
   while (1) {
-    PORTB = 0b00010000;
+    pin_on(PB4);
     _delay_ms(500);
-    PORTB = 0b00000000;
+    pin_off(PB4);
     _delay_ms(500);
   }
   return 0;
+}
+
+void pin_as_output (uint8_t pin) {
+  DDRB |= (1 << pin);
+}
+
+void pin_on (uint8_t pin) {
+  PORTB |= (1 << pin);
+}
+
+void pin_off (uint8_t pin) {
+  PORTB &= ~(1 << pin);
 }
