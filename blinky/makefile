@@ -1,4 +1,4 @@
-MCU = ATTINY13A
+MCU = ATTINY2313A
 
 ## Fuses, see http://www.engbedded.com/fusecalc
 

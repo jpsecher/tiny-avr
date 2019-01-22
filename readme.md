@@ -123,3 +123,8 @@ To get rid of an old installation:
     $ brew cask uninstall arduino
     $ rm -rf ~/Library/Arduino15
 
+Protocols:
+
+- USI SPI: https://www.microchip.com/wwwAppNotes/AppNotes.aspx?appnote=en591657
+- UART: https://www.microchip.com/wwwAppNotes/AppNotes.aspx?appnote=en591208
+
