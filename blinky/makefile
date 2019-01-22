@@ -1,4 +1,4 @@
-MCU = ATTINY2313A
+MCU = ATTINY13A
 
 ## Fuses, see http://www.engbedded.com/fusecalc
 
@@ -16,9 +16,9 @@ FUSES = -U lfuse:w:0xE4:m -U hfuse:w:0xdf:m -U efuse:w:0xff:m
 CLOCK = 8000000
 endif
 
-PROGRAMMER = -c avrispmkii
+PROGRAMMER = avrispmkii
 OBJECTS = main.o
-AVRDUDE = avrdude $(PROGRAMMER) -p $(SHORT_DEVICE)
+AVRDUDE = avrdude -c $(PROGRAMMER) -p $(SHORT_DEVICE)
 COMPILE = avr-gcc -Wall -Os -DF_CPU=$(CLOCK) -mmcu=$(DEVICE)
 
 all: main.hex
@@ -32,6 +32,8 @@ all: main.hex
 .c.s:
 	$(COMPILE) -S $< -o $@
 
+# If you have an EEPROM section, you must also create a hex file for the
+# EEPROM and add it to the "flash" target.
 flash: all
 	$(AVRDUDE) -U flash:w:main.hex:i
 
@@ -39,10 +41,6 @@ fuse:
 	$(AVRDUDE) $(FUSES)
 
 install: flash fuse
-
-# if you use a bootloader, change the command below appropriately:
-load: all
-	bootloadHID main.hex
 
 clean:
 	rm -f main.hex main.elf $(OBJECTS)
@@ -55,11 +53,10 @@ main.hex: main.elf
 	avr-objcopy -j .text -j .data -O ihex main.elf main.hex
 	avr-size --format=avr --mcu=$(DEVICE) main.elf
 
-# If you have an EEPROM section, you must also create a hex file for the
-# EEPROM and add it to the "flash" target.
-
 disasm:	main.elf
 	avr-objdump -d main.elf
 
 cpp:
 	$(COMPILE) -E main.c
+
+.PHONY: disasm clean flash all

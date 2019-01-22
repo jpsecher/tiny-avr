@@ -8,7 +8,7 @@ INLINE void pin_on (uint8_t pin);
 INLINE void pin_off (uint8_t pin);
 
 int main () {
-	pin_as_output(PB4);
+  pin_as_output(PB4);
   while (1) {
     pin_on(PB4);
     _delay_ms(1000);

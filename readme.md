@@ -99,7 +99,7 @@ Change to pure C++: https://electronut.in/getting-started-with-attiny85-avr-prog
 
 
 
-The [datasheet](http://ww1.microchip.com/downloads/en/devicedoc/8246s.pdf).
+The [datasheet](http://ww1.microchip.com/downloads/en/devicedoc/8246s.pdf).  More at [Microchip](https://www.microchip.com/wwwproducts/en/ATtiny2313).
 
 
 ## ATtiny 13A
