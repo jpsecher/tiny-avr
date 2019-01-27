@@ -1,4 +1,4 @@
-MCU = ATTINY13A
+MCU = ATTINY2313A
 
 ## Fuses, see http://www.engbedded.com/fusecalc
 
@@ -12,8 +12,8 @@ endif
 ifeq ($(MCU), ATTINY2313A)
 DEVICE = attiny2313a
 SHORT_DEVICE = t2313
-FUSES = -U lfuse:w:0xE4:m -U hfuse:w:0xdf:m -U efuse:w:0xff:m
-CLOCK = 8000000
+FUSES = -U lfuse:w:0xFF:m -U hfuse:w:0xDF:m -U efuse:w:0xFF:m
+CLOCK = 12288000
 endif
 
 PROGRAMMER = avrispmkii

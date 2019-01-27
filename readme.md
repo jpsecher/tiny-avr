@@ -64,7 +64,7 @@ Load the new boards by Tools->Board->BoardsManager and search for `attiny`.  Cli
 
 ## ATtiny2313A
 
-Change the speed to 8MHz:
+Change the speed to 8MHz (see [AVR Fuse Calculator](http://www.engbedded.com/fusecalc/)):
 
     $ avrdude -p t2313 -U lfuse:w:0xE4:m
 
@@ -97,7 +97,11 @@ Make it blink with Aduino IDE:
 
 Change to pure C++: https://electronut.in/getting-started-with-attiny85-avr-programming/
 
+Use with external crystal oscillator (>=8MHz, maximum upstart time):
 
+    $ avrdude -p t2313 -U lfuse:w:0xFF:m -U hfuse:w:0xDF:m
+
+I use a 12.288 MHz crystal because I have a bunch of them.
 
 The [datasheet](http://ww1.microchip.com/downloads/en/devicedoc/8246s.pdf).  More at [Microchip](https://www.microchip.com/wwwproducts/en/ATtiny2313).
 
