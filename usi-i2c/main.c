@@ -29,12 +29,14 @@ int main () {
   master_initialise();
   pin_as_output(PB0);
   while (1) {
-    uint8_t const data[] = { 0xAA, 0x81, 0xFF };
-    start_transceiver_with_data(data, 3);
+    uint8_t const high[] = { 0b11000000, 0b01000000, 0xFF, 0xFF };
+    start_transceiver_with_data(high, 4);
     pin_on(PB0);
     _delay_ms(500);
+    uint8_t const low[] = { 0b11000000, 0b01000000, 0x00, 0x00 };
+    start_transceiver_with_data(low, 4);
     pin_off(PB0);
-    _delay_ms(400);
+    _delay_ms(500);
   }
   return 0;
 }
