@@ -22,7 +22,7 @@
 INLINE void master_initialise ();
 INLINE void usi_start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize);
 INLINE uint8_t usi_master_transfer ();
-INLINE uint8_t usi_master_stop ();
+INLINE void usi_master_stop ();
 INLINE void pin_as_output (uint8_t pin);
 INLINE void pin_on (uint8_t pin);
 INLINE void pin_off (uint8_t pin);
@@ -31,8 +31,9 @@ union {
   uint8_t value;
   struct {
     uint8_t usi_slave_did_not_respond : 1;
-    uint8_t usi_sda_not_clear : 1;
-    uint8_t usi_sck_not_clear : 1;
+    uint8_t usi_twi_missing_stop : 1;
+    //uint8_t usi_sda_not_clear : 1;
+    //uint8_t usi_sck_not_clear : 1;
   };
 } error;
 
@@ -73,12 +74,12 @@ int main () {
     usi_start_transceiver_with_data(low, 4);
     if (error.value != 0) show_error_state_perpetually();
     pin_on(PIN_STATUS);
-    _delay_ms(500);
+    _delay_ms(200);
     uint8_t const high[] = { 0b11000000, 0b01000000, 0xFF, 0xFF };
     usi_start_transceiver_with_data(high, 4);
     if (error.value != 0) show_error_state_perpetually();
     pin_off(PIN_STATUS);
-    _delay_ms(200);
+    _delay_ms(500);
   }
   return 0;
 }
@@ -126,34 +127,35 @@ void master_initialise () {
   usi_prepare_transmit_8_bit();
 }
 
+void usi_master_start () {
+  usi_pin_yank(PIN_USI_SDA);
+  _delay_us(I2C_SHORT_DELAY_US);
+  usi_pin_yank(PIN_USI_SCL);
+  usi_pin_release(PIN_USI_SDA);
+}
+
 void usi_start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize) {
   /* Release SCL to ensure that (repeated) Start can be performed */
   usi_pin_release(PIN_USI_SCL);
   while( !(PIN_USI & (1<<PIN_USI_SCL)) );          // Verify that SCL becomes high.
   _delay_us(I2C_SHORT_DELAY_US);
-  /* Generate Start Condition */
-  usi_pin_yank(PIN_USI_SDA);
-  _delay_us(I2C_SHORT_DELAY_US);
-  usi_pin_yank(PIN_USI_SCL);
-  usi_pin_release(PIN_USI_SDA);
+  usi_master_start();
   do {
     /* Write a byte */
     usi_pin_yank(PIN_USI_SCL);
-    USIDR     = *(msg++);                        // Setup data.
+    USIDR = *(msg++);
     usi_prepare_transmit_8_bit();
     usi_master_transfer();
-    /* Clock and verify (N)ACK from slave */
+    /* Clock and verify ACK from slave */
     usi_pin_as_output(PIN_USI_SDA);
     #define TWI_NACK_BIT  0       // Bit position for (N)ACK bit.
     usi_prepare_transmit_1_bit();
-    if( usi_master_transfer() & (1<<TWI_NACK_BIT) )
-    {
-      // Slave did not respond.
+    if( usi_master_transfer() & (1<<TWI_NACK_BIT) ) {
       error.usi_slave_did_not_respond = 1;
       return;
     }
-  } while( --msgSize);                             // Until all data sent/received.
-  usi_master_stop();                           // Send a STOP condition on the TWI bus.
+  } while( --msgSize);
+  usi_master_stop();
   return;
 }
 
@@ -178,21 +180,20 @@ uint8_t usi_master_transfer () {
   return received;
 }
 
-uint8_t usi_master_stop () {
+void usi_master_stop ()
+{
   usi_pin_yank(PIN_USI_SDA);
   usi_pin_release(PIN_USI_SCL);
   while( !(PIN_USI & (1<<PIN_USI_SCL)) );  // Wait for SCL to go high.
   _delay_us(I2C_SHORT_DELAY_US);
   usi_pin_release(PIN_USI_SDA);
   _delay_us(I2C_LONG_DELAY_US);
-# ifdef SIGNAL_VERIFY
-  if( !(USISR & (1<<USIPF)) )
+  if (!(USISR & (1<<USIPF)))
   {
-    USI_TWI_state.errorState = USI_TWI_MISSING_STOP_CON;
-    return 0;
+    error.usi_twi_missing_stop = 1;
+    return;
   }
-# endif
-  return 1;
+  return;
 }
 
 void pin_as_output (uint8_t pin) {
