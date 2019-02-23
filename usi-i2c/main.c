@@ -20,7 +20,6 @@ INLINE void master_initialise ();
 INLINE uint8_t start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize);
 INLINE uint8_t master_transfer (uint8_t temp);
 INLINE uint8_t master_stop ();
-
 INLINE void pin_as_output (uint8_t pin);
 INLINE void pin_on (uint8_t pin);
 INLINE void pin_off (uint8_t pin);
@@ -29,28 +28,16 @@ int main () {
   master_initialise();
   pin_as_output(PB0);
   while (1) {
-    uint8_t const high[] = { 0b11000000, 0b01000000, 0xFF, 0xFF };
-    start_transceiver_with_data(high, 4);
-    pin_on(PB0);
-    _delay_ms(500);
     uint8_t const low[] = { 0b11000000, 0b01000000, 0x00, 0x00 };
     start_transceiver_with_data(low, 4);
+    pin_on(PB0);
+    _delay_ms(500);
+    uint8_t const high[] = { 0b11000000, 0b01000000, 0xFF, 0xFF };
+    start_transceiver_with_data(high, 4);
     pin_off(PB0);
     _delay_ms(500);
   }
   return 0;
-}
-
-void pin_as_output (uint8_t pin) {
-  DDRB |= _BV(pin);
-}
-
-void pin_on (uint8_t pin) {
-  PORTB |= _BV(pin);
-}
-
-void pin_off (uint8_t pin) {
-  PORTB &= ~_BV(pin);
 }
 
 void master_initialise () {
@@ -135,4 +122,16 @@ uint8_t master_stop () {
   }
 # endif
   return 1;
+}
+
+void pin_as_output (uint8_t pin) {
+  DDRB |= _BV(pin);
+}
+
+void pin_on (uint8_t pin) {
+  PORTB |= _BV(pin);
+}
+
+void pin_off (uint8_t pin) {
+  PORTB &= ~_BV(pin);
 }
