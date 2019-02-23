@@ -84,12 +84,12 @@ int main ()
     usi_start_transceiver_with_data(low, 4);
     if (error.value != 0) show_error_state_perpetually();
     pin_on(PIN_STATUS);
-    _delay_ms(200);
+    _delay_ms(500);
     uint8_t const high[] = { 0b11000000, 0b01000000, 0xFF, 0xFF };
     usi_start_transceiver_with_data(high, 4);
     if (error.value != 0) show_error_state_perpetually();
     pin_off(PIN_STATUS);
-    _delay_ms(500);
+    _delay_ms(200);
   }
   return 0;
 }
@@ -173,17 +173,20 @@ uint8_t usi_fail_on_slave_nack ()
   usi_prepare_transmit_1_bit();
   #define I2C_NACK 0x1
   if (usi_master_transfer() & I2C_NACK)
-  {
     error.usi_slave_did_not_respond = 1;
-  }
   return error.value;
+}
+
+void usi_wait_for_scl_release ()
+{
+  while (!(PIN_USI & _BV(PIN_USI_SCL)));
 }
 
 void usi_start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize)
 {
   /* Release SCL to ensure that (repeated) Start can be performed */
   usi_pin_release(PIN_USI_SCL);
-  while( !(PIN_USI & (1<<PIN_USI_SCL)) );          // Verify that SCL becomes high.
+  usi_wait_for_scl_release();
   _delay_us(I2C_SHORT_DELAY_US);
   usi_master_start();
   do
@@ -208,7 +211,7 @@ uint8_t usi_master_transfer ()
     _delay_us(I2C_LONG_DELAY_US);
     // Generate positve SCL edge.
     usi_toggle_clock_line();
-    while( !(PIN_USI & (1<<PIN_USI_SCL)) );// Wait for SCL to go high.
+    usi_wait_for_scl_release();
     _delay_us(I2C_SHORT_DELAY_US);
     // Generate negative SCL edge.
     usi_toggle_clock_line();
@@ -225,14 +228,12 @@ void usi_master_stop ()
 {
   usi_pin_yank(PIN_USI_SDA);
   usi_pin_release(PIN_USI_SCL);
-  while( !(PIN_USI & (1<<PIN_USI_SCL)) );  // Wait for SCL to go high.
+  usi_wait_for_scl_release();
   _delay_us(I2C_SHORT_DELAY_US);
   usi_pin_release(PIN_USI_SDA);
   _delay_us(I2C_LONG_DELAY_US);
   if (!(USISR & (1<<USIPF)))
-  {
     error.usi_twi_missing_stop = 1;
-  }
 }
 
 void pin_as_output (uint8_t pin)
