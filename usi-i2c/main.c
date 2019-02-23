@@ -18,7 +18,7 @@
 
 INLINE void master_initialise ();
 INLINE uint8_t start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize);
-INLINE uint8_t master_transfer ();
+INLINE uint8_t usi_master_transfer ();
 INLINE uint8_t master_stop ();
 INLINE void pin_as_output (uint8_t pin);
 INLINE void pin_on (uint8_t pin);
@@ -94,12 +94,12 @@ uint8_t start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize) {
     PORT_USI &= ~(1<<PIN_USI_SCL);                // Pull SCL LOW.
     USIDR     = *(msg++);                        // Setup data.
     usi_prepare_transmit_8_bit();
-    master_transfer();
+    usi_master_transfer();
     /* Clock and verify (N)ACK from slave */
     DDR_USI  &= ~(1<<PIN_USI_SDA);                // Enable SDA as input.
     #define TWI_NACK_BIT  0       // Bit position for (N)ACK bit.
     usi_prepare_transmit_1_bit();
-    if( master_transfer() & (1<<TWI_NACK_BIT) )
+    if( usi_master_transfer() & (1<<TWI_NACK_BIT) )
     {
       // Slave did not respond.
       // TODO: return 0;
@@ -109,24 +109,25 @@ uint8_t start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize) {
   return 1;
 }
 
-uint8_t master_transfer () {
-  uint8_t temp;
-  temp  =  (0<<USISIE)|(0<<USIOIE)|                 // Interrupts disabled
-           (1<<USIWM1)|(0<<USIWM0)|                 // Set USI in Two-wire mode.
-           (1<<USICS1)|(0<<USICS0)|(1<<USICLK)|     // Software clock strobe as source.
-           (1<<USITC);                              // Toggle Clock Port.
+void usi_toggle_clock_line () {
+  USICR = _BV(USIWM1) | _BV(USICS1) | _BV(USICLK) | _BV(USITC);
+}
+
+uint8_t usi_master_transfer () {
   do {
     _delay_us( T2_TWI/4 );
-    USICR = temp;                          // Generate positve SCL edge.
+    // Generate positve SCL edge.
+    usi_toggle_clock_line();
     while( !(PIN_USI & (1<<PIN_USI_SCL)) );// Wait for SCL to go high.
     _delay_us( T4_TWI/4 );
-    USICR = temp;                          // Generate negative SCL edge.
+    // Generate negative SCL edge.
+    usi_toggle_clock_line();
   } while( !(USISR & (1<<USIOIF)) );       // Check for transfer complete.
   _delay_us( T2_TWI/4 );
-  temp  = USIDR;                           // Read out data.
-  USIDR = 0xFF;                            // Release SDA.
+  uint8_t result = USIDR;                           // Read out data.
+  usi_release_sda();
   DDR_USI |= (1<<PIN_USI_SDA);             // Enable SDA as output.
-  return temp;                             // Return the data from the USIDR
+  return result;                             // Return the data from the USIDR
 }
 
 uint8_t master_stop () {
