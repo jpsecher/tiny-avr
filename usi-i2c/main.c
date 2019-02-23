@@ -29,7 +29,6 @@ INLINE void pin_off (uint8_t pin);
 
 union
 {
-  uint8_t value;
   struct
   {
     uint8_t usi_slave_did_not_respond : 1;
@@ -37,6 +36,7 @@ union
     //uint8_t usi_sda_not_clear : 1;
     //uint8_t usi_sck_not_clear : 1;
   };
+  uint8_t value;
 }
 error;
 
@@ -84,12 +84,12 @@ int main ()
     usi_start_transceiver_with_data(low, 4);
     if (error.value != 0) show_error_state_perpetually();
     pin_on(PIN_STATUS);
-    _delay_ms(200);
+    _delay_ms(500);
     uint8_t const high[] = { 0b11000000, 0b01000000, 0xFF, 0xFF };
     usi_start_transceiver_with_data(high, 4);
     if (error.value != 0) show_error_state_perpetually();
     pin_off(PIN_STATUS);
-    _delay_ms(500);
+    _delay_ms(200);
   }
   return 0;
 }
@@ -132,7 +132,7 @@ void usi_prepare_transmit_8_bit ()
 void usi_prepare_transmit_1_bit ()
 {
   usi_prepare_transmit_8_bit();
-  // Only count two twice.
+  // Only count for one clock pulse (ie. change twice).
   USISR |= (0xE<<USICNT0);
 }
 
@@ -154,6 +154,14 @@ void usi_master_start ()
   usi_pin_release(PIN_USI_SDA);
 }
 
+void usi_write_byte (uint8_t data)
+{
+  usi_pin_yank(PIN_USI_SCL);
+  USIDR = data;
+  usi_prepare_transmit_8_bit();
+  usi_master_transfer();
+}
+
 void usi_start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize)
 {
   /* Release SCL to ensure that (repeated) Start can be performed */
@@ -163,22 +171,18 @@ void usi_start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize)
   usi_master_start();
   do
   {
-    /* Write a byte */
-    usi_pin_yank(PIN_USI_SCL);
-    USIDR = *(msg++);
-    usi_prepare_transmit_8_bit();
-    usi_master_transfer();
+    usi_write_byte(*(msg++));
     /* Clock and verify ACK from slave */
     usi_pin_as_output(PIN_USI_SDA);
-    #define TWI_NACK_BIT  0       // Bit position for (N)ACK bit.
     usi_prepare_transmit_1_bit();
-    if( usi_master_transfer() & (1<<TWI_NACK_BIT) )
+    #define I2C_NACK 0x1
+    if (usi_master_transfer() & I2C_NACK)
     {
       error.usi_slave_did_not_respond = 1;
       return;
     }
   }
-  while( --msgSize);
+  while (--msgSize);
   usi_master_stop();
 }
 
