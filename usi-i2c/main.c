@@ -13,13 +13,14 @@
 
 #define PIN_STATUS PB0
 
+// TWI fast mode.
 #define I2C_LONG_DELAY_US ((((F_CPU * 1.3) /1000000) +1) / 4)
 #define I2C_SHORT_DELAY_US ((((F_CPU * 0.6) /1000000) +1) / 4)
 
 #define INLINE static inline
 
 INLINE void master_initialise ();
-INLINE uint8_t usi_start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize);
+INLINE void usi_start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize);
 INLINE uint8_t usi_master_transfer ();
 INLINE uint8_t usi_master_stop ();
 INLINE void pin_as_output (uint8_t pin);
@@ -37,7 +38,6 @@ union {
 
 void reset_error_state () {
   error.value = 0;
-  // error.usi_slave_did_not_respond = 1;
   // error.usi_sda_not_clear = 1;
   // error.usi_sck_not_clear = 1;
 }
@@ -66,16 +66,17 @@ void show_error_state_perpetually () {
 
 int main () {
   reset_error_state();
-  show_error_state_perpetually();
   master_initialise();
   pin_as_output(PIN_STATUS);
   while (1) {
     uint8_t const low[] = { 0b11000000, 0b01000000, 0x00, 0x00 };
     usi_start_transceiver_with_data(low, 4);
+    if (error.value != 0) show_error_state_perpetually();
     pin_on(PIN_STATUS);
     _delay_ms(500);
     uint8_t const high[] = { 0b11000000, 0b01000000, 0xFF, 0xFF };
     usi_start_transceiver_with_data(high, 4);
+    if (error.value != 0) show_error_state_perpetually();
     pin_off(PIN_STATUS);
     _delay_ms(200);
   }
@@ -84,6 +85,10 @@ int main () {
 
 void usi_pin_release (uint8_t pin) {
   PORT_USI |= _BV(pin);
+}
+
+void usi_pin_yank (uint8_t pin) {
+  PORT_USI &= ~(_BV(pin));
 }
 
 void usi_pin_as_output (uint8_t pin) {
@@ -121,19 +126,19 @@ void master_initialise () {
   usi_prepare_transmit_8_bit();
 }
 
-uint8_t usi_start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize) {
+void usi_start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize) {
   /* Release SCL to ensure that (repeated) Start can be performed */
   usi_pin_release(PIN_USI_SCL);
   while( !(PIN_USI & (1<<PIN_USI_SCL)) );          // Verify that SCL becomes high.
-  _delay_us(I2C_SHORT_DELAY_US);                         // Delay for T4TWI if TWI_FAST_MODE
-  /* Generate Start Condition */
-  PORT_USI &= ~(1<<PIN_USI_SDA);                    // Force SDA LOW.
   _delay_us(I2C_SHORT_DELAY_US);
-  PORT_USI &= ~(1<<PIN_USI_SCL);                    // Pull SCL LOW.
+  /* Generate Start Condition */
+  usi_pin_yank(PIN_USI_SDA);
+  _delay_us(I2C_SHORT_DELAY_US);
+  usi_pin_yank(PIN_USI_SCL);
   usi_pin_release(PIN_USI_SDA);
   do {
     /* Write a byte */
-    PORT_USI &= ~(1<<PIN_USI_SCL);                // Pull SCL LOW.
+    usi_pin_yank(PIN_USI_SCL);
     USIDR     = *(msg++);                        // Setup data.
     usi_prepare_transmit_8_bit();
     usi_master_transfer();
@@ -144,11 +149,12 @@ uint8_t usi_start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize) {
     if( usi_master_transfer() & (1<<TWI_NACK_BIT) )
     {
       // Slave did not respond.
-      return 0;
+      error.usi_slave_did_not_respond = 1;
+      return;
     }
   } while( --msgSize);                             // Until all data sent/received.
   usi_master_stop();                           // Send a STOP condition on the TWI bus.
-  return 1;
+  return;
 }
 
 void usi_toggle_clock_line () {
@@ -166,14 +172,14 @@ uint8_t usi_master_transfer () {
     usi_toggle_clock_line();
   } while( !(USISR & (1<<USIOIF)) );       // Check for transfer complete.
   _delay_us(I2C_LONG_DELAY_US);
-  uint8_t result = USIDR;                           // Read out data.
+  uint8_t received = USIDR;
   usi_release_data_register();
   usi_pin_as_output(PIN_USI_SDA);
-  return result;                             // Return the data from the USIDR
+  return received;
 }
 
 uint8_t usi_master_stop () {
-  PORT_USI &= ~(1<<PIN_USI_SDA);           // Pull SDA low.
+  usi_pin_yank(PIN_USI_SDA);
   usi_pin_release(PIN_USI_SCL);
   while( !(PIN_USI & (1<<PIN_USI_SCL)) );  // Wait for SCL to go high.
   _delay_us(I2C_SHORT_DELAY_US);
