@@ -76,13 +76,13 @@ int main ()
     if (error.value != 0)
       show_error_state_perpetually();
     pin_on(PIN_STATUS);
-    _delay_ms(500);
-    uint8_t const high[] = { 0b11000000, 0b01000000, 0xFF, 0xFF };
+    _delay_ms(200);
+    uint8_t const high[] = { 0b11000000, 0b01000000, 0x6F, 0xFF };
     usi_start_transceiver_with_data(high, 4);
     if (error.value != 0)
       show_error_state_perpetually();
     pin_off(PIN_STATUS);
-    _delay_ms(200);
+    _delay_ms(500);
   }
   return 0;
 }
