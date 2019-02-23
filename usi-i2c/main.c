@@ -20,19 +20,41 @@
 #define INLINE static inline
 
 INLINE void master_initialise ();
-INLINE void usi_start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize);
 INLINE uint8_t usi_master_transfer ();
 INLINE void usi_master_stop ();
 INLINE void pin_as_output (uint8_t pin);
 INLINE void pin_on (uint8_t pin);
 INLINE void pin_off (uint8_t pin);
+INLINE void usi_pin_release (uint8_t pin);
+INLINE void usi_pin_yank (uint8_t pin);
+INLINE void usi_pin_as_output (uint8_t pin);
+INLINE void usi_pin_as_input (uint8_t pin);
+INLINE void usi_set_data (uint8_t data);
+INLINE void usi_reset_data_register ();
+INLINE void usi_use_two_wire_software_clock ();
+INLINE void usi_prepare_transmit_8_bit ();
+INLINE void usi_prepare_transmit_1_bit ();
+INLINE void usi_wait_for_scl_release ();
+INLINE void usi_toggle_clock_line ();
+INLINE void usi_write_byte (uint8_t data);
+INLINE void usi_send_until_transfer_complete ();
+
+INLINE void reset_error_state ();
+INLINE uint8_t usi_fail_on_slave_nack ();
+INLINE uint8_t usi_fail_on_missing_start ();
+INLINE uint8_t usi_fail_on_missing_stop ();
+INLINE uint8_t usi_fail_on_bus_noise ();
+
+void show_error_state_perpetually ();
+void usi_start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize);
 
 union
 {
   struct
   {
     uint8_t usi_slave_did_not_respond : 1;
-    uint8_t usi_twi_missing_stop : 1;
+    uint8_t usi_missing_stop : 1;
+    uint8_t usi_missing_start : 1;
     uint8_t usi_unexpected_start : 1;
     uint8_t usi_unexpected_stop : 1;
     uint8_t usi_unexpected_collision : 1;
@@ -41,9 +63,27 @@ union
 }
 error;
 
-void reset_error_state ()
+int main ()
 {
-  error.value = 0;
+  reset_error_state();
+  master_initialise();
+  pin_as_output(PIN_STATUS);
+  while (1)
+  {
+    uint8_t const low[] = { 0b11000000, 0b01000000, 0x00, 0x00 };
+    usi_start_transceiver_with_data(low, 4);
+    if (error.value != 0)
+      show_error_state_perpetually();
+    pin_on(PIN_STATUS);
+    _delay_ms(500);
+    uint8_t const high[] = { 0b11000000, 0b01000000, 0xFF, 0xFF };
+    usi_start_transceiver_with_data(high, 4);
+    if (error.value != 0)
+      show_error_state_perpetually();
+    pin_off(PIN_STATUS);
+    _delay_ms(200);
+  }
+  return 0;
 }
 
 void show_error_state_perpetually ()
@@ -72,27 +112,98 @@ void show_error_state_perpetually ()
   }
 }
 
-int main ()
+void master_initialise ()
 {
-  reset_error_state();
-  master_initialise();
-  pin_as_output(PIN_STATUS);
-  while (1)
+  usi_pin_release(PIN_USI_SDA);
+  usi_pin_release(PIN_USI_SCL);
+  usi_pin_as_output(PIN_USI_SCL);
+  usi_pin_as_output(PIN_USI_SDA);
+  usi_reset_data_register();
+  usi_prepare_transmit_8_bit();
+}
+
+void usi_master_start ()
+{
+  usi_pin_yank(PIN_USI_SDA);
+  _delay_us(I2C_SHORT_DELAY_US);
+  usi_pin_yank(PIN_USI_SCL);
+  usi_pin_release(PIN_USI_SDA);
+}
+
+void usi_start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize)
+{
+  if (usi_fail_on_bus_noise())
+    return;
+  usi_pin_release(PIN_USI_SCL);
+  usi_wait_for_scl_release();
+  _delay_us(I2C_SHORT_DELAY_US);
+  usi_master_start();
+  // if (usi_fail_on_missing_start())
+  //   return;
+  do
   {
-    uint8_t const low[] = { 0b11000000, 0b01000000, 0x00, 0x00 };
-    usi_start_transceiver_with_data(low, 4);
-    if (error.value != 0)
-      show_error_state_perpetually();
-    pin_on(PIN_STATUS);
-    _delay_ms(500);
-    uint8_t const high[] = { 0b11000000, 0b01000000, 0xFF, 0xFF };
-    usi_start_transceiver_with_data(high, 4);
-    if (error.value != 0)
-      show_error_state_perpetually();
-    pin_off(PIN_STATUS);
-    _delay_ms(200);
+    usi_write_byte(*(msg++));
+    if (usi_fail_on_slave_nack())
+      return;
   }
-  return 0;
+  while (--msgSize);
+  usi_master_stop();
+  usi_fail_on_missing_stop();
+}
+
+void usi_send_until_transfer_complete ()
+{
+  do
+  {
+    _delay_us(I2C_LONG_DELAY_US);
+    // Generate positve SCL edge.
+    usi_toggle_clock_line();
+    usi_wait_for_scl_release();
+    _delay_us(I2C_SHORT_DELAY_US);
+    // Generate negative SCL edge.
+    usi_toggle_clock_line();
+  }
+  while (!(USISR & _BV(USIOIF)));
+}
+
+uint8_t usi_master_transfer ()
+{
+  usi_send_until_transfer_complete();
+  _delay_us(I2C_LONG_DELAY_US);
+  uint8_t received = USIDR;
+  usi_reset_data_register();
+  usi_pin_as_output(PIN_USI_SDA);
+  return received;
+}
+
+void usi_master_stop ()
+{
+  usi_pin_yank(PIN_USI_SDA);
+  usi_pin_release(PIN_USI_SCL);
+  usi_wait_for_scl_release();
+  _delay_us(I2C_SHORT_DELAY_US);
+  usi_pin_release(PIN_USI_SDA);
+  _delay_us(I2C_LONG_DELAY_US);
+}
+
+void pin_as_output (uint8_t pin)
+{
+  DDRB |= _BV(pin);
+}
+
+void pin_on (uint8_t pin)
+{
+  PORTB |= _BV(pin);
+}
+
+void pin_off (uint8_t pin)
+{
+  PORTB &= ~_BV(pin);
+}
+
+void reset_error_state ()
+{
+  error.value = 0;
 }
 
 void usi_pin_release (uint8_t pin)
@@ -142,22 +253,14 @@ void usi_prepare_transmit_1_bit ()
   USISR |= (0xE<<USICNT0);
 }
 
-void master_initialise ()
+void usi_wait_for_scl_release ()
 {
-  usi_pin_release(PIN_USI_SDA);
-  usi_pin_release(PIN_USI_SCL);
-  usi_pin_as_output(PIN_USI_SCL);
-  usi_pin_as_output(PIN_USI_SDA);
-  usi_reset_data_register();
-  usi_prepare_transmit_8_bit();
+  while (!(PIN_USI & _BV(PIN_USI_SCL)));
 }
 
-void usi_master_start ()
+void usi_toggle_clock_line ()
 {
-  usi_pin_yank(PIN_USI_SDA);
-  _delay_us(I2C_SHORT_DELAY_US);
-  usi_pin_yank(PIN_USI_SCL);
-  usi_pin_release(PIN_USI_SDA);
+  USICR = _BV(USIWM1) | _BV(USICS1) | _BV(USICLK) | _BV(USITC);
 }
 
 void usi_write_byte (uint8_t data)
@@ -178,9 +281,18 @@ uint8_t usi_fail_on_slave_nack ()
   return error.value;
 }
 
-void usi_wait_for_scl_release ()
+uint8_t usi_fail_on_missing_start ()
 {
-  while (!(PIN_USI & _BV(PIN_USI_SCL)));
+  if (!(USISR & _BV(USISIF)))
+    error.usi_missing_start = 1;
+  return error.value;
+}
+
+uint8_t usi_fail_on_missing_stop ()
+{
+  if (!(USISR & _BV(USIPF)))
+    error.usi_missing_stop = 1;
+  return error.value;
 }
 
 uint8_t usi_fail_on_bus_noise ()
@@ -192,80 +304,4 @@ uint8_t usi_fail_on_bus_noise ()
   if (USISR & _BV(USIDC))
     error.usi_unexpected_collision = 1;
   return error.value;
-}
-
-void usi_start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize)
-{
-  if (usi_fail_on_bus_noise())
-    return;
-  /* Release SCL to ensure that (repeated) Start can be performed */
-  usi_pin_release(PIN_USI_SCL);
-  usi_wait_for_scl_release();
-  _delay_us(I2C_SHORT_DELAY_US);
-  usi_master_start();
-  do
-  {
-    usi_write_byte(*(msg++));
-    if (usi_fail_on_slave_nack())
-      return;
-  }
-  while (--msgSize);
-  usi_master_stop();
-}
-
-void usi_toggle_clock_line ()
-{
-  USICR = _BV(USIWM1) | _BV(USICS1) | _BV(USICLK) | _BV(USITC);
-}
-
-void usi_send_until_transfer_complete ()
-{
-  do
-  {
-    _delay_us(I2C_LONG_DELAY_US);
-    // Generate positve SCL edge.
-    usi_toggle_clock_line();
-    usi_wait_for_scl_release();
-    _delay_us(I2C_SHORT_DELAY_US);
-    // Generate negative SCL edge.
-    usi_toggle_clock_line();
-  }
-  while (!(USISR & _BV(USIOIF)));
-}
-
-uint8_t usi_master_transfer ()
-{
-  usi_send_until_transfer_complete();
-  _delay_us(I2C_LONG_DELAY_US);
-  uint8_t received = USIDR;
-  usi_reset_data_register();
-  usi_pin_as_output(PIN_USI_SDA);
-  return received;
-}
-
-void usi_master_stop ()
-{
-  usi_pin_yank(PIN_USI_SDA);
-  usi_pin_release(PIN_USI_SCL);
-  usi_wait_for_scl_release();
-  _delay_us(I2C_SHORT_DELAY_US);
-  usi_pin_release(PIN_USI_SDA);
-  _delay_us(I2C_LONG_DELAY_US);
-  if (!(USISR & (1<<USIPF)))
-    error.usi_twi_missing_stop = 1;
-}
-
-void pin_as_output (uint8_t pin)
-{
-  DDRB |= _BV(pin);
-}
-
-void pin_on (uint8_t pin)
-{
-  PORTB |= _BV(pin);
-}
-
-void pin_off (uint8_t pin)
-{
-  PORTB &= ~_BV(pin);
 }
