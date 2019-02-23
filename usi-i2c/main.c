@@ -84,12 +84,12 @@ int main ()
     usi_start_transceiver_with_data(low, 4);
     if (error.value != 0) show_error_state_perpetually();
     pin_on(PIN_STATUS);
-    _delay_ms(500);
+    _delay_ms(200);
     uint8_t const high[] = { 0b11000000, 0b01000000, 0xFF, 0xFF };
     usi_start_transceiver_with_data(high, 4);
     if (error.value != 0) show_error_state_perpetually();
     pin_off(PIN_STATUS);
-    _delay_ms(200);
+    _delay_ms(500);
   }
   return 0;
 }
@@ -204,7 +204,7 @@ void usi_toggle_clock_line ()
   USICR = _BV(USIWM1) | _BV(USICS1) | _BV(USICLK) | _BV(USITC);
 }
 
-uint8_t usi_master_transfer ()
+void usi_send_until_transfer_complete ()
 {
   do
   {
@@ -216,7 +216,12 @@ uint8_t usi_master_transfer ()
     // Generate negative SCL edge.
     usi_toggle_clock_line();
   }
-  while( !(USISR & (1<<USIOIF)) );       // Check for transfer complete.
+  while (!(USISR & _BV(USIOIF)));
+}
+
+uint8_t usi_master_transfer ()
+{
+  usi_send_until_transfer_complete();
   _delay_us(I2C_LONG_DELAY_US);
   uint8_t received = USIDR;
   usi_release_data_register();
