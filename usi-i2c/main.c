@@ -33,8 +33,9 @@ union
   {
     uint8_t usi_slave_did_not_respond : 1;
     uint8_t usi_twi_missing_stop : 1;
-    //uint8_t usi_sda_not_clear : 1;
-    //uint8_t usi_sck_not_clear : 1;
+    uint8_t usi_unexpected_start : 1;
+    uint8_t usi_unexpected_stop : 1;
+    uint8_t usi_unexpected_collision : 1;
   };
   uint8_t value;
 }
@@ -43,8 +44,6 @@ error;
 void reset_error_state ()
 {
   error.value = 0;
-  // error.usi_sda_not_clear = 1;
-  // error.usi_sck_not_clear = 1;
 }
 
 void show_error_state_perpetually ()
@@ -59,13 +58,13 @@ void show_error_state_perpetually ()
     uint8_t error_bits = error.value;
     while (error_bits != 0)
     {
-      if (error_bits & 1)
-      {
-        pin_on(PIN_STATUS);
-      }
-      _delay_ms(200);
+      pin_on(PIN_STATUS);
+      _delay_ms(25);
+      if (!(error_bits & 1))
+        pin_off(PIN_STATUS);
+      _delay_ms(275);
       pin_off(PIN_STATUS);
-      _delay_ms(200);
+      _delay_ms(100);
       error_bits >>= 1;
     }
     pin_off(PIN_STATUS);
@@ -82,14 +81,16 @@ int main ()
   {
     uint8_t const low[] = { 0b11000000, 0b01000000, 0x00, 0x00 };
     usi_start_transceiver_with_data(low, 4);
-    if (error.value != 0) show_error_state_perpetually();
+    if (error.value != 0)
+      show_error_state_perpetually();
     pin_on(PIN_STATUS);
-    _delay_ms(200);
+    _delay_ms(500);
     uint8_t const high[] = { 0b11000000, 0b01000000, 0xFF, 0xFF };
     usi_start_transceiver_with_data(high, 4);
-    if (error.value != 0) show_error_state_perpetually();
+    if (error.value != 0)
+      show_error_state_perpetually();
     pin_off(PIN_STATUS);
-    _delay_ms(500);
+    _delay_ms(200);
   }
   return 0;
 }
@@ -119,7 +120,7 @@ void usi_set_data (uint8_t data)
   USIDR = data;
 }
 
-void usi_release_data_register ()
+void usi_reset_data_register ()
 {
   usi_set_data(0xFF);
 }
@@ -137,7 +138,7 @@ void usi_prepare_transmit_8_bit ()
 void usi_prepare_transmit_1_bit ()
 {
   usi_prepare_transmit_8_bit();
-  // Only count for one clock pulse (ie. change twice).
+  // Only count for one clock cycle (ie. change twice).
   USISR |= (0xE<<USICNT0);
 }
 
@@ -147,7 +148,7 @@ void master_initialise ()
   usi_pin_release(PIN_USI_SCL);
   usi_pin_as_output(PIN_USI_SCL);
   usi_pin_as_output(PIN_USI_SDA);
-  usi_release_data_register();
+  usi_reset_data_register();
   usi_prepare_transmit_8_bit();
 }
 
@@ -182,8 +183,21 @@ void usi_wait_for_scl_release ()
   while (!(PIN_USI & _BV(PIN_USI_SCL)));
 }
 
+uint8_t usi_fail_on_bus_noise ()
+{
+  if (USISR & _BV(USISIF))
+    error.usi_unexpected_start = 1;
+  // if (USISR & _BV(USIPF))
+  //   error.usi_unexpected_stop = 1;
+  if (USISR & _BV(USIDC))
+    error.usi_unexpected_collision = 1;
+  return error.value;
+}
+
 void usi_start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize)
 {
+  if (usi_fail_on_bus_noise())
+    return;
   /* Release SCL to ensure that (repeated) Start can be performed */
   usi_pin_release(PIN_USI_SCL);
   usi_wait_for_scl_release();
@@ -224,7 +238,7 @@ uint8_t usi_master_transfer ()
   usi_send_until_transfer_complete();
   _delay_us(I2C_LONG_DELAY_US);
   uint8_t received = USIDR;
-  usi_release_data_register();
+  usi_reset_data_register();
   usi_pin_as_output(PIN_USI_SDA);
   return received;
 }
