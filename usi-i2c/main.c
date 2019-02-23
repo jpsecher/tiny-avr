@@ -40,18 +40,32 @@ int main () {
   return 0;
 }
 
+void usi_pin_pullup (uint8_t pin) {
+  PORT_USI |= _BV(pin);
+}
+
+void usi_pin_as_output (uint8_t pin) {
+  DDR_USI |= _BV(pin);
+}
+
+void usi_set_data (uint8_t data) {
+  USIDR = data;
+}
+
+void usi_release_sda () {
+  usi_set_data(0xFF);
+}
+
 void master_initialise () {
-  PORT_USI |= (1<<PIN_USI_SDA);           // Enable pullup on SDA, to set high as released state.
-  PORT_USI |= (1<<PIN_USI_SCL);           // Enable pullup on SCL, to set high as released state.
-  DDR_USI  |= (1<<PIN_USI_SCL);           // Enable SCL as output.
-  DDR_USI  |= (1<<PIN_USI_SDA);           // Enable SDA as output.
-  USIDR    =  0xFF;                       // Preload dataregister with "released level" data.
-  USICR    =  (0<<USISIE)|(0<<USIOIE)|                            // Disable Interrupts.
-              (1<<USIWM1)|(0<<USIWM0)|                            // Set USI in Two-wire mode.
-              (1<<USICS1)|(0<<USICS0)|(1<<USICLK)|                // Software stobe as counter clock source
-              (0<<USITC);
-  USISR   =   (1<<USISIF)|(1<<USIOIF)|(1<<USIPF)|(1<<USIDC)|      // Clear flags,
-              (0x0<<USICNT0);                                     // and reset counter.
+  usi_pin_pullup(PIN_USI_SDA);
+  usi_pin_pullup(PIN_USI_SCL);
+  usi_pin_as_output(PIN_USI_SCL);
+  usi_pin_as_output(PIN_USI_SDA);
+  usi_release_sda();
+  USICR    =  (1<<USIWM1)|                            // Set USI in Two-wire mode.
+              (1<<USICS1)|(1<<USICLK)                // Software strobe as counter clock source
+              ;
+  USISR   =   (1<<USISIF)|(1<<USIOIF)|(1<<USIPF)|(1<<USIDC);     // Clear flags,
 }
 
 uint8_t start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize) {
