@@ -1,7 +1,7 @@
 #include <avr/io.h>
 #include <util/delay.h>
 
-#if defined(__AVR_ATtiny2313A__)
+#if defined(__AVR_ATtiny2313A__) || defined(__AVR_ATtiny4313__)
 #  define DDR_USI DDRB
 #  define PORT_USI PORTB
 #  define PIN_USI PINB
@@ -11,8 +11,6 @@
 #  define PIN_USI_SCL PINB7
 #endif
 
-//#define T2_TWI    ((F_CPU * 1.3) /1000000) +1 // >1,3us
-//#define T4_TWI    ((F_CPU * 0.6) /1000000) +1 // >0,6us
 #define I2C_LONG_DELAY_US ((((F_CPU * 1.3) /1000000) +1) / 4)
 #define I2C_SHORT_DELAY_US ((((F_CPU * 0.6) /1000000) +1) / 4)
 
@@ -33,16 +31,16 @@ int main () {
     uint8_t const low[] = { 0b11000000, 0b01000000, 0x00, 0x00 };
     start_transceiver_with_data(low, 4);
     pin_on(PB0);
-    _delay_ms(200);
+    _delay_ms(500);
     uint8_t const high[] = { 0b11000000, 0b01000000, 0xFF, 0xFF };
     start_transceiver_with_data(high, 4);
     pin_off(PB0);
-    _delay_ms(500);
+    _delay_ms(200);
   }
   return 0;
 }
 
-void usi_pin_pullup (uint8_t pin) {
+void usi_pin_release (uint8_t pin) {
   PORT_USI |= _BV(pin);
 }
 
@@ -54,7 +52,7 @@ void usi_set_data (uint8_t data) {
   USIDR = data;
 }
 
-void usi_release_sda () {
+void usi_release_data_register () {
   usi_set_data(0xFF);
 }
 
@@ -73,24 +71,24 @@ void usi_prepare_transmit_1_bit () {
 }
 
 void master_initialise () {
-  usi_pin_pullup(PIN_USI_SDA);
-  usi_pin_pullup(PIN_USI_SCL);
+  usi_pin_release(PIN_USI_SDA);
+  usi_pin_release(PIN_USI_SCL);
   usi_pin_as_output(PIN_USI_SCL);
   usi_pin_as_output(PIN_USI_SDA);
-  usi_release_sda();
+  usi_release_data_register();
   usi_prepare_transmit_8_bit();
 }
 
 uint8_t start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize) {
   /* Release SCL to ensure that (repeated) Start can be performed */
-  PORT_USI |= (1<<PIN_USI_SCL);                     // Release SCL.
+  usi_pin_release(PIN_USI_SCL);
   while( !(PIN_USI & (1<<PIN_USI_SCL)) );          // Verify that SCL becomes high.
-  _delay_us( I2C_SHORT_DELAY_US );                         // Delay for T4TWI if TWI_FAST_MODE
+  _delay_us(I2C_SHORT_DELAY_US);                         // Delay for T4TWI if TWI_FAST_MODE
   /* Generate Start Condition */
   PORT_USI &= ~(1<<PIN_USI_SDA);                    // Force SDA LOW.
-  _delay_us( I2C_SHORT_DELAY_US );
+  _delay_us(I2C_SHORT_DELAY_US);
   PORT_USI &= ~(1<<PIN_USI_SCL);                    // Pull SCL LOW.
-  PORT_USI |= (1<<PIN_USI_SDA);                     // Release SDA.
+  usi_pin_release(PIN_USI_SDA);
   do {
     /* Write a byte */
     PORT_USI &= ~(1<<PIN_USI_SCL);                // Pull SCL LOW.
@@ -98,7 +96,7 @@ uint8_t start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize) {
     usi_prepare_transmit_8_bit();
     usi_master_transfer();
     /* Clock and verify (N)ACK from slave */
-    DDR_USI  &= ~(1<<PIN_USI_SDA);                // Enable SDA as input.
+    usi_pin_as_output(PIN_USI_SDA);
     #define TWI_NACK_BIT  0       // Bit position for (N)ACK bit.
     usi_prepare_transmit_1_bit();
     if( usi_master_transfer() & (1<<TWI_NACK_BIT) )
@@ -117,28 +115,28 @@ void usi_toggle_clock_line () {
 
 uint8_t usi_master_transfer () {
   do {
-    _delay_us( I2C_LONG_DELAY_US );
+    _delay_us(I2C_LONG_DELAY_US);
     // Generate positve SCL edge.
     usi_toggle_clock_line();
     while( !(PIN_USI & (1<<PIN_USI_SCL)) );// Wait for SCL to go high.
-    _delay_us( I2C_SHORT_DELAY_US );
+    _delay_us(I2C_SHORT_DELAY_US);
     // Generate negative SCL edge.
     usi_toggle_clock_line();
   } while( !(USISR & (1<<USIOIF)) );       // Check for transfer complete.
-  _delay_us( I2C_LONG_DELAY_US );
+  _delay_us(I2C_LONG_DELAY_US);
   uint8_t result = USIDR;                           // Read out data.
-  usi_release_sda();
-  DDR_USI |= (1<<PIN_USI_SDA);             // Enable SDA as output.
+  usi_release_data_register();
+  usi_pin_as_output(PIN_USI_SDA);
   return result;                             // Return the data from the USIDR
 }
 
 uint8_t usi_master_stop () {
   PORT_USI &= ~(1<<PIN_USI_SDA);           // Pull SDA low.
-  PORT_USI |= (1<<PIN_USI_SCL);            // Release SCL.
+  usi_pin_release(PIN_USI_SCL);
   while( !(PIN_USI & (1<<PIN_USI_SCL)) );  // Wait for SCL to go high.
-  _delay_us( I2C_SHORT_DELAY_US );
-  PORT_USI |= (1<<PIN_USI_SDA);            // Release SDA.
-  _delay_us( I2C_LONG_DELAY_US );
+  _delay_us(I2C_SHORT_DELAY_US);
+  usi_pin_release(PIN_USI_SDA);
+  _delay_us(I2C_LONG_DELAY_US);
 # ifdef SIGNAL_VERIFY
   if( !(USISR & (1<<USIPF)) )
   {
