@@ -84,12 +84,12 @@ int main ()
     usi_start_transceiver_with_data(low, 4);
     if (error.value != 0) show_error_state_perpetually();
     pin_on(PIN_STATUS);
-    _delay_ms(500);
+    _delay_ms(200);
     uint8_t const high[] = { 0b11000000, 0b01000000, 0xFF, 0xFF };
     usi_start_transceiver_with_data(high, 4);
     if (error.value != 0) show_error_state_perpetually();
     pin_off(PIN_STATUS);
-    _delay_ms(200);
+    _delay_ms(500);
   }
   return 0;
 }
@@ -107,6 +107,11 @@ void usi_pin_yank (uint8_t pin)
 void usi_pin_as_output (uint8_t pin)
 {
   DDR_USI |= _BV(pin);
+}
+
+void usi_pin_as_input (uint8_t pin)
+{
+  DDR_USI &= ~(_BV(pin));
 }
 
 void usi_set_data (uint8_t data)
@@ -162,6 +167,18 @@ void usi_write_byte (uint8_t data)
   usi_master_transfer();
 }
 
+uint8_t usi_fail_on_slave_nack ()
+{
+  usi_pin_as_input(PIN_USI_SDA);
+  usi_prepare_transmit_1_bit();
+  #define I2C_NACK 0x1
+  if (usi_master_transfer() & I2C_NACK)
+  {
+    error.usi_slave_did_not_respond = 1;
+  }
+  return error.value;
+}
+
 void usi_start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize)
 {
   /* Release SCL to ensure that (repeated) Start can be performed */
@@ -172,15 +189,8 @@ void usi_start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize)
   do
   {
     usi_write_byte(*(msg++));
-    /* Clock and verify ACK from slave */
-    usi_pin_as_output(PIN_USI_SDA);
-    usi_prepare_transmit_1_bit();
-    #define I2C_NACK 0x1
-    if (usi_master_transfer() & I2C_NACK)
-    {
-      error.usi_slave_did_not_respond = 1;
+    if (usi_fail_on_slave_nack())
       return;
-    }
   }
   while (--msgSize);
   usi_master_stop();
