@@ -18,7 +18,7 @@
 
 INLINE void master_initialise ();
 INLINE uint8_t start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize);
-INLINE uint8_t master_transfer (uint8_t temp);
+INLINE uint8_t master_transfer ();
 INLINE uint8_t master_stop ();
 INLINE void pin_as_output (uint8_t pin);
 INLINE void pin_on (uint8_t pin);
@@ -56,23 +56,30 @@ void usi_release_sda () {
   usi_set_data(0xFF);
 }
 
+void usi_use_two_wire_software_clock () {
+  USICR = _BV(USIWM1) | _BV(USICS1) | _BV(USICLK);
+}
+
+void usi_prepare_transmit_8_bit () {
+  USISR = _BV(USISIF) | _BV(USIOIF) | _BV(USIPF) | _BV(USIDC);
+}
+
+void usi_prepare_transmit_1_bit () {
+  usi_prepare_transmit_8_bit();
+  // Only count two twice.
+  USISR |= (0xE<<USICNT0);
+}
+
 void master_initialise () {
   usi_pin_pullup(PIN_USI_SDA);
   usi_pin_pullup(PIN_USI_SCL);
   usi_pin_as_output(PIN_USI_SCL);
   usi_pin_as_output(PIN_USI_SDA);
   usi_release_sda();
-  USICR    =  (1<<USIWM1)|                            // Set USI in Two-wire mode.
-              (1<<USICS1)|(1<<USICLK)                // Software strobe as counter clock source
-              ;
-  USISR   =   (1<<USISIF)|(1<<USIOIF)|(1<<USIPF)|(1<<USIDC);     // Clear flags,
+  usi_prepare_transmit_8_bit();
 }
 
 uint8_t start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize) {
-  uint8_t tempUSISR_8bit = (1<<USISIF)|(1<<USIOIF)|(1<<USIPF)|(1<<USIDC)|      // Prepare register value to: Clear flags, and
-                           (0x0<<USICNT0);                                     // set USI to shift 8 bits i.e. count 16 clock edges.
-  uint8_t tempUSISR_1bit = (1<<USISIF)|(1<<USIOIF)|(1<<USIPF)|(1<<USIDC)|      // Prepare register value to: Clear flags, and
-                           (0xE<<USICNT0);                                     // set USI to shift 1 bit i.e. count 2 clock edges.
   /* Release SCL to ensure that (repeated) Start can be performed */
   PORT_USI |= (1<<PIN_USI_SCL);                     // Release SCL.
   while( !(PIN_USI & (1<<PIN_USI_SCL)) );          // Verify that SCL becomes high.
@@ -86,11 +93,13 @@ uint8_t start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize) {
     /* Write a byte */
     PORT_USI &= ~(1<<PIN_USI_SCL);                // Pull SCL LOW.
     USIDR     = *(msg++);                        // Setup data.
-    master_transfer( tempUSISR_8bit );    // Send 8 bits on bus.
+    usi_prepare_transmit_8_bit();
+    master_transfer();
     /* Clock and verify (N)ACK from slave */
     DDR_USI  &= ~(1<<PIN_USI_SDA);                // Enable SDA as input.
     #define TWI_NACK_BIT  0       // Bit position for (N)ACK bit.
-    if( master_transfer( tempUSISR_1bit ) & (1<<TWI_NACK_BIT) )
+    usi_prepare_transmit_1_bit();
+    if( master_transfer() & (1<<TWI_NACK_BIT) )
     {
       // Slave did not respond.
       // TODO: return 0;
@@ -100,9 +109,8 @@ uint8_t start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize) {
   return 1;
 }
 
-uint8_t master_transfer (uint8_t temp) {
-  USISR = temp;                                     // Set USISR according to temp.
-                                                    // Prepare clocking.
+uint8_t master_transfer () {
+  uint8_t temp;
   temp  =  (0<<USISIE)|(0<<USIOIE)|                 // Interrupts disabled
            (1<<USIWM1)|(0<<USIWM0)|                 // Set USI in Two-wire mode.
            (1<<USICS1)|(0<<USICS0)|(1<<USICLK)|     // Software clock strobe as source.
