@@ -17,10 +17,10 @@
 #define I2C_LONG_DELAY_US ((((F_CPU * 1.3) /1000000) +1) / 4)
 #define I2C_SHORT_DELAY_US ((((F_CPU * 0.6) /1000000) +1) / 4)
 
-#define INLINE static inline
+#define INLINE static __attribute__((always_inline)) inline
 
 INLINE void master_initialise ();
-INLINE uint8_t usi_master_transfer ();
+INLINE void usi_master_start ();
 INLINE void usi_master_stop ();
 INLINE void pin_as_output (uint8_t pin);
 INLINE void pin_on (uint8_t pin);
@@ -47,6 +47,7 @@ INLINE uint8_t usi_fail_on_bus_noise ();
 
 void show_error_state_perpetually ();
 void usi_start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize);
+uint8_t usi_master_transfer ();
 
 union
 {
@@ -122,14 +123,6 @@ void master_initialise ()
   usi_prepare_transmit_8_bit();
 }
 
-void usi_master_start ()
-{
-  usi_pin_yank(PIN_USI_SDA);
-  _delay_us(I2C_SHORT_DELAY_US);
-  usi_pin_yank(PIN_USI_SCL);
-  usi_pin_release(PIN_USI_SDA);
-}
-
 void usi_start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize)
 {
   if (usi_fail_on_bus_noise())
@@ -149,6 +142,14 @@ void usi_start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize)
   while (--msgSize);
   usi_master_stop();
   usi_fail_on_missing_stop();
+}
+
+void usi_master_start ()
+{
+  usi_pin_yank(PIN_USI_SDA);
+  _delay_us(I2C_SHORT_DELAY_US);
+  usi_pin_yank(PIN_USI_SCL);
+  usi_pin_release(PIN_USI_SDA);
 }
 
 void usi_send_until_transfer_complete ()
@@ -198,7 +199,7 @@ void pin_on (uint8_t pin)
 
 void pin_off (uint8_t pin)
 {
-  PORTB &= ~_BV(pin);
+  PORTB &= ~(_BV(pin));
 }
 
 void reset_error_state ()
