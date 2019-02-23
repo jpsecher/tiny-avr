@@ -11,30 +11,72 @@
 #  define PIN_USI_SCL PINB7
 #endif
 
+#define PIN_STATUS PB0
+
 #define I2C_LONG_DELAY_US ((((F_CPU * 1.3) /1000000) +1) / 4)
 #define I2C_SHORT_DELAY_US ((((F_CPU * 0.6) /1000000) +1) / 4)
 
 #define INLINE static inline
 
 INLINE void master_initialise ();
-INLINE uint8_t start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize);
+INLINE uint8_t usi_start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize);
 INLINE uint8_t usi_master_transfer ();
 INLINE uint8_t usi_master_stop ();
 INLINE void pin_as_output (uint8_t pin);
 INLINE void pin_on (uint8_t pin);
 INLINE void pin_off (uint8_t pin);
 
+union {
+  uint8_t value;
+  struct {
+    uint8_t usi_slave_did_not_respond : 1;
+    uint8_t usi_sda_not_clear : 1;
+    uint8_t usi_sck_not_clear : 1;
+  };
+} error;
+
+void reset_error_state () {
+  error.value = 0;
+  // error.usi_slave_did_not_respond = 1;
+  // error.usi_sda_not_clear = 1;
+  // error.usi_sck_not_clear = 1;
+}
+
+void show_error_state_perpetually () {
+  pin_as_output(PIN_STATUS);
+  while (1) {
+    pin_on(PIN_STATUS);
+    _delay_ms(1000);
+    pin_off(PIN_STATUS);
+    _delay_ms(200);
+    uint8_t error_bits = error.value;
+    while (error_bits != 0) {
+      if (error_bits & 1) {
+        pin_on(PIN_STATUS);
+      }
+      _delay_ms(200);
+      pin_off(PIN_STATUS);
+      _delay_ms(200);
+      error_bits >>= 1;
+    }
+    pin_off(PIN_STATUS);
+    _delay_ms(1000);
+  }
+}
+
 int main () {
+  reset_error_state();
+  show_error_state_perpetually();
   master_initialise();
-  pin_as_output(PB0);
+  pin_as_output(PIN_STATUS);
   while (1) {
     uint8_t const low[] = { 0b11000000, 0b01000000, 0x00, 0x00 };
-    start_transceiver_with_data(low, 4);
-    pin_on(PB0);
+    usi_start_transceiver_with_data(low, 4);
+    pin_on(PIN_STATUS);
     _delay_ms(500);
     uint8_t const high[] = { 0b11000000, 0b01000000, 0xFF, 0xFF };
-    start_transceiver_with_data(high, 4);
-    pin_off(PB0);
+    usi_start_transceiver_with_data(high, 4);
+    pin_off(PIN_STATUS);
     _delay_ms(200);
   }
   return 0;
@@ -79,7 +121,7 @@ void master_initialise () {
   usi_prepare_transmit_8_bit();
 }
 
-uint8_t start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize) {
+uint8_t usi_start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize) {
   /* Release SCL to ensure that (repeated) Start can be performed */
   usi_pin_release(PIN_USI_SCL);
   while( !(PIN_USI & (1<<PIN_USI_SCL)) );          // Verify that SCL becomes high.
@@ -102,7 +144,7 @@ uint8_t start_transceiver_with_data (uint8_t const * msg, uint8_t msgSize) {
     if( usi_master_transfer() & (1<<TWI_NACK_BIT) )
     {
       // Slave did not respond.
-      // TODO: return 0;
+      return 0;
     }
   } while( --msgSize);                             // Until all data sent/received.
   usi_master_stop();                           // Send a STOP condition on the TWI bus.
