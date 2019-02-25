@@ -56,7 +56,7 @@ INLINE void pin_on (uint8_t pin);
 INLINE void pin_off (uint8_t pin);
 
 INLINE void reset_error_state ();
-void show_error_state_perpetually ();
+void show_error_state_until_clear ();
 
 INLINE void process_receive ();
 
@@ -64,28 +64,18 @@ union
 {
   struct
   {
+    uint8_t usart_frame_error : 1;
+    uint8_t usart_data_overrun : 1;
     uint8_t usi_slave_did_not_respond : 1;
     uint8_t usi_missing_stop : 1;
     uint8_t usi_missing_start : 1;
     uint8_t usi_unexpected_start : 1;
     uint8_t usi_unexpected_stop : 1;
     uint8_t usi_unexpected_collision : 1;
-    uint8_t usart_frame_error : 1;
-    uint8_t usart_data_overrun : 1;
   };
   uint8_t value;
 }
 error;
-
-void toggle_status_pin ()
-{
-  static uint16_t counter = 0;
-  if (counter == 0)
-    pin_on(PIN_STATUS);
-  if (counter == 0x8000)
-    pin_off(PIN_STATUS);
-  ++counter;
-}
 
 int main ()
 {
@@ -99,9 +89,7 @@ int main ()
     if (midi_data_received)
       process_receive();
     if (error.value != 0)
-      show_error_state_perpetually();
-    if (counter == 0)
-      toggle_status_pin();
+      show_error_state_until_clear();
     ++counter;
   }
   return 0;
@@ -112,10 +100,10 @@ void reset_error_state ()
   error.value = 0;
 }
 
-void show_error_state_perpetually ()
+void show_error_state_until_clear ()
 {
   pin_as_output(PIN_STATUS);
-  while (1)
+  do
   {
     pin_on(PIN_STATUS);
     _delay_ms(1000);
@@ -136,6 +124,7 @@ void show_error_state_perpetually ()
     pin_off(PIN_STATUS);
     _delay_ms(1000);
   }
+  while (error.value);
 }
 
 void process_receive ()
@@ -143,11 +132,13 @@ void process_receive ()
   //uint8_t const data = midi_byte_received;
   midi_data_received = 0;
   static uint16_t dac_out = 0;
-  dac_out += 0b10000;
   #define MCP492x_ADDRESS 0b11000000
   #define MCP492x_WRITE_OUT_A 0b01000000
   uint8_t const dac_message[] = { MCP492x_ADDRESS, MCP492x_WRITE_OUT_A, (dac_out >> 8), dac_out };
   usi_start_transceiver_with_data(dac_message, 4);
+  if (dac_out < 0x2000)
+    dac_out = 0x2000;
+  dac_out += 0x80;
 }
 
 
