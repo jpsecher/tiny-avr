@@ -49,7 +49,7 @@ INLINE void enable_usart_receiver_by_interrupt ();
 INLINE void set_usart_async_8N1 ();
 INLINE void process_receive ();
 volatile uint8_t midi_data_received = 0;
-uint8_t midi_byte_received;
+volatile uint8_t midi_byte_received;
 
 INLINE void pin_as_output (uint8_t pin);
 INLINE void pin_on (uint8_t pin);
@@ -333,16 +333,16 @@ void set_usart_speed (uint16_t clock_divider)
 }
 
 void enable_usart_receiver_by_interrupt () {
-  UCSRB = (1<<RXCIE) | (1<<RXEN);
+  UCSRB = _BV(RXCIE) | _BV(RXEN);
 }
 
 void set_usart_async_8N1 () {
-  UCSRC = (1<<UCSZ0) | (1<<UCSZ1);
+  UCSRC = _BV(UCSZ0) | _BV(UCSZ1);
 }
 
 ISR (USART_RX_vect) {
-  error.usart_frame_error = (UCSRA & (1<<FE)) ? 1 : 0;
-  error.usart_data_overrun = (UCSRA & (1<<DOR)) ? 1 : 0;
+  error.usart_frame_error = (UCSRA & _BV(FE)) ? 1 : 0;
+  error.usart_data_overrun = (UCSRA & _BV(DOR)) ? 1 : 0;
   midi_byte_received = UDR;
   midi_data_received = 1;
 }
