@@ -62,7 +62,7 @@ Replace the bundled `avrdude` with the Brew version:
 
 Load the new boards by Tools->Board->BoardsManager and search for `attiny`.  Click Install, and after that the boards status should read INSTALLED.
 
-## ATtiny2313A
+## ATtiny2313A / ATtiny4313
 
 Change the speed to 8MHz (see [AVR Fuse Calculator](http://www.engbedded.com/fusecalc/)):
 
