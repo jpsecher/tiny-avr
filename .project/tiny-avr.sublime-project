@@ -8,6 +8,9 @@
       [ { "name": "irq-time"
         , "working_dir": "${project_path}/../irq-time"
         }
+      , { "name": "irq-button"
+        , "working_dir": "${project_path}/../irq-button"
+        }
       ]
     }
   ]
