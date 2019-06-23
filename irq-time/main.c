@@ -21,7 +21,6 @@ int main ()
 {
     portd_pin_as_output(PIN_11);
     setup_fast_timer();
-    sei();
     while (1)
     {
         uint32_t const ms = time_ms();
@@ -41,6 +40,7 @@ void setup_fast_timer () {
     clear_timer_on_compare_mode();
     match_every_1ms();
     interupt_on_match();
+    sei();
 }
 
 void scale_clock_down_by_1024 () {
@@ -81,7 +81,10 @@ void reset_time () {
 }
 
 uint32_t time_ms () {
-    return IRQ__time_ms;
+    cli();
+    uint32_t ms = IRQ__time_ms;
+    sei();
+    return ms;
 }
 
 ISR (TIMER0_COMPA_vect) {
