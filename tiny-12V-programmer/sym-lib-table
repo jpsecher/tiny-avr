@@ -1,0 +1,3 @@
+(sym_lib_table
+  (lib (name tiny)(type Legacy)(uri /Users/jps/repos/electronics/tiny-avr/tiny.lib)(options "")(descr ""))
+)
