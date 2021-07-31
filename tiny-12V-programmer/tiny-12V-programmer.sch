@@ -745,4 +745,6 @@ Wire Wire Line
 	3750 5150 3750 4950
 Wire Wire Line
 	3750 5350 3750 5550
+Text Notes 8250 1950 0    50   ~ 0
+TODO: smaller PNP\nTODO: 5V regulator\nTODO: LED for programming
 $EndSCHEMATC
