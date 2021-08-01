@@ -114,6 +114,23 @@ The [datasheet](http://ww1.microchip.com/downloads/en/DeviceDoc/doc8126.pdf).
 
 The [datasheet](http://ww1.microchip.com/downloads/en/DeviceDoc/atmel-8127-avr-8-bit-microcontroller-attiny4-attiny5-attiny9-attiny10_datasheet.pdf).
 
+### Setup for 12V programming
+
+Connect the AVR-ISP-MK2 directly to the ATtiny10 via TPI, see [picture](?).  Use [AVR Fuse Calculator](http://www.engbedded.com/fusecalc/) and https://www.avrfreaks.net/forum/fuse-rstdisbl-attiny10 to see how to set RSTDISBL:
+
+    $ avrdude -c avrispmkii -p t10 -U fuse:w:0xfe:m
+
+After that it is only possible to program with 12V on reset pin.
+
+### Programming using 12V programmer board
+
+See `tiny-12V-programmer` directory for schematic, PCB, etc. 
+
+With the ATtiny10 fused to RSTDISBL and placed in the 12V programmer board, run a connectivity test:
+
+    $ avrdude -c avrispmkii -p t10 
+
+
 ## MIDI receive
 
 - Install MIDI Library from Forty Seven Effects in Arduino IDE.
