@@ -6,27 +6,22 @@
 #define INLINE static inline
 
 INLINE void set_clock_to_8MHz (void);
-INLINE void all_pins_as_output (void);
+INLINE void pin_as_input_with_pull_up (uint8_t pin);
+INLINE void pin_as_output (uint8_t pin);
 INLINE void pin_on (uint8_t pin);
 INLINE void pin_off (uint8_t pin);
 
 int main () {
   set_clock_to_8MHz();
-  all_pins_as_output();
+  pin_as_input_with_pull_up(PB0);
+  pin_as_output(PB1);
   while (1) {
-    pin_on(PB3);
-    _delay_ms(100);
-    pin_off(PB3);
-    pin_on(PB2);
-    _delay_ms(100);
-    pin_off(PB2);
-    pin_on(PB1);
-    _delay_ms(100);
-    pin_off(PB1);
-    pin_on(PB0);
-    _delay_ms(100);
-    pin_off(PB0);
-    _delay_ms(400);
+    if (PINB & _BV(PB0)) {
+      pin_off(PB1);
+    } else {
+      pin_on(PB1);
+    }
+    _delay_ms(1);
   }
   return 0;
 }
@@ -38,8 +33,13 @@ void set_clock_to_8MHz (void) {
   CLKPSR = 0;
 }
 
-void all_pins_as_output (void) {
-  DDRB = _BV(PB0) | _BV(PB1) | _BV(PB2) | _BV(PB3);
+void pin_as_input_with_pull_up (uint8_t pin) {
+  DDRB &= ~_BV(pin);
+  PUEB |= _BV(pin);
+}
+
+void pin_as_output (uint8_t pin) {
+  DDRB |= _BV(pin);
 }
 
 void pin_on (uint8_t pin) {

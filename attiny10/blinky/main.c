@@ -5,15 +5,12 @@
 
 #define INLINE static inline
 
-INLINE void pin_as_output (uint8_t pin);
+INLINE void all_pins_as_output (void);
 INLINE void pin_on (uint8_t pin);
 INLINE void pin_off (uint8_t pin);
 
 int main () {
-  pin_as_output(PB0);
-  pin_as_output(PB1);
-  pin_as_output(PB2);
-  pin_as_output(PB3);
+  all_pins_as_output();
   while (1) {
     pin_on(PB0);
     _delay_ms(100);
@@ -32,8 +29,8 @@ int main () {
   return 0;
 }
 
-void pin_as_output (uint8_t pin) {
-  DDRB |= _BV(pin);
+void all_pins_as_output (void) {
+  DDRB = _BV(PB0) | _BV(PB1) | _BV(PB2) | _BV(PB3);
 }
 
 void pin_on (uint8_t pin) {
