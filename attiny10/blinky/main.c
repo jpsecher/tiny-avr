@@ -1,3 +1,15 @@
+/*
+  Connections:
+
+  PB0 --- +LED- --- GND
+
+  PB1 --- +LED- --- GND
+
+  PB2 --- +LED- --- GND
+
+  PB3 --- +LED- --- GND
+*/
+
 #define F_CPU 1000000  // 1MHz because divided by 8 by default
 
 #include <avr/io.h>

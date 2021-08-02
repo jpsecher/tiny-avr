@@ -1,3 +1,11 @@
+/*
+  Connections:
+
+  PB0 --- PushButton --- GND
+
+  PB1 --- +LED- --- GND
+*/
+
 #define F_CPU 8000000  // 8MHz
 
 #include <avr/io.h>
