@@ -20,17 +20,20 @@
 
 
 enum Status {
+  // Non-errors.
   S_ok,
   S_processing_needed,
-  S_memory_layout_error = 42,
+  // Errors.
+  S_memory_layout_error,
   S_unknown_error,
   S_end_marker
 };
 
 #define N_INTR_HANDLERS 3
 uint8_t intr_handler_data_layout_H [N_INTR_HANDLERS];
+uint8_t intr_handler_to_data_index_H [N_INTR_HANDLERS];
 
-#define N_INTR_TOTAL_BYTES 4
+#define N_INTR_TOTAL_BYTES 5
 uint8_t intr_handler_data [N_INTR_TOTAL_BYTES];
 
 enum Intr_Handler {
@@ -43,6 +46,9 @@ enum Intr_Handler {
 
 INLINE void ui_init (void);
 INLINE void init_intr_handler_tables (void);
+INLINE void set_data_H_n_b (uint8_t handler, uint8_t index, uint8_t data);
+INLINE void set_status_H_S (uint8_t handler, uint8_t status);
+INLINE void init_intr_handler_data (void);
 INLINE void sanity_check (void);
 INLINE void simulate_error (void);
 INLINE void error_loop (void);
@@ -56,18 +62,20 @@ int main () {
   init_intr_handler_tables();
   ui_init();
   sanity_check();
-  //simulate_error();
+  simulate_error();
   error_loop();
   return 0;
 }
 
 void simulate_error (void) {
+  set_status_H_S(H_sanity, S_memory_layout_error);
+  set_status_H_S(H_other_handler, S_unknown_error);
 }
 
 void error_loop (void) {
   while (1) {
     show_all_errors();
-    _delay_ms(500);
+    _delay_ms(LONG_BLINK_ms);
   }
 }
 
@@ -77,7 +85,7 @@ void show_all_errors (void) {
   uint8_t status;
   for (; handler < N_INTR_HANDLERS; ++handler) {
     status = intr_handler_data[data_index];
-    if (status > S_processing_needed) {
+    if (status >= S_memory_layout_error) {
       show_error(status);
     }
     data_index += intr_handler_data_layout_H[handler];
@@ -123,9 +131,26 @@ void init_intr_handler_tables (void) {
   intr_handler_data_layout_H[H_sanity] = 1;  // status byte for sanity check
   intr_handler_data_layout_H[H_my_handler] = 3;  // my_intr_handler uses status byte and two value bytes
   intr_handler_data_layout_H[H_other_handler] = 1;  // another_intr_handler only uses status byte
-  memset(intr_handler_data, S_ok, N_INTR_TOTAL_BYTES);
+  init_intr_handler_data();
 };
 
+void init_intr_handler_data (void) {
+  uint8_t handler = 0;
+  uint8_t data_index = 0;
+  for (; handler < N_INTR_HANDLERS; ++handler) {
+    intr_handler_to_data_index_H[handler] = data_index;
+    data_index += intr_handler_data_layout_H[handler];
+  }
+  memset(intr_handler_data, S_ok, N_INTR_TOTAL_BYTES);
+}
+
+void set_status_H_S (uint8_t handler, uint8_t status) {
+  set_data_H_n_b(handler, 0,  status);
+}
+
+void set_data_H_n_b (uint8_t handler, uint8_t index, uint8_t data) {
+  intr_handler_data[intr_handler_to_data_index_H[handler]+index] = data;
+}
 
 void ui_init (void) {
   pin_as_output_A(A_CC_LED);
