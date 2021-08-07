@@ -1,3 +1,4 @@
-*.hex
 *.elf
+*.hex
 *.o
+*.zip

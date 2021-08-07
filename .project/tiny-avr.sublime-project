@@ -11,6 +11,9 @@
       , { "name": "irq-button"
         , "working_dir": "${project_path}/../irq-button"
         }
+      , { "name": "blink-error-loop"
+        , "working_dir": "${project_path}/../attiny88/blink-error-loop"
+        }
       ]
     }
   ]
