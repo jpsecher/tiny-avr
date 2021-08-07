@@ -1,5 +1,6 @@
 #define F_CPU 8000000
 
+#include <avr/interrupt.h>
 #include <avr/io.h>
 #include <util/delay.h>
 #include <string.h>
@@ -15,8 +16,12 @@
 // PA1 --- +Green LED- --- GND
 #define A_CV_LED PA1
 
+//
+// Buttons & Encoder use PCI2 (pins PDx)
+//
+
 // uC --- SW_PUSH --- GND
-#define C_OE_SW PC7
+#define D_OE_SW PD2
 
 #define SHORT_BLINK_ms 50
 #define LONG_BLINK_ms 450
@@ -63,12 +68,16 @@ INLINE void turn_off_output (void);
 INLINE void pin_as_output_A (uint8_t pin);
 INLINE void pin_on_A (uint8_t pin);
 INLINE void pin_off_A (uint8_t pin);
-INLINE void pin_as_input_with_pull_up_C (uint8_t pin);
+INLINE void pin_as_input_with_pull_up_D (uint8_t pin);
+INLINE void setup_irq_on_buttons_and_encoders (void);
+INLINE void pcint_23_to_16_generate_interupt_on_pci2 (void);
+INLINE void enable_interupt_from_buttons_and_encoders (void);
 
 
 int main () {
   init_intr_handler_tables();
   ui_init();
+  setup_irq_on_buttons_and_encoders();
   sanity_check();
   // simulate_error();  // <-------
   while (1) {
@@ -78,10 +87,10 @@ int main () {
       _delay_ms(LONG_BLINK_ms);
     }
     // Normal processing...
-    if (PINC & _BV(C_OE_SW))
-      pin_off_A(A_CV_LED);
-    else
+    if (bit_is_clear(PIND, D_OE_SW))
       pin_on_A(A_CV_LED);
+    else
+      pin_off_A(A_CV_LED);
   }
   return 0;
 }
@@ -188,7 +197,7 @@ uint8_t get_data_H_n (uint8_t handler, uint8_t index) {
 void ui_init (void) {
   pin_as_output_A(A_CC_LED);
   pin_as_output_A(A_CV_LED);
-  pin_as_input_with_pull_up_C(C_OE_SW);
+  pin_as_input_with_pull_up_D(D_OE_SW);
 }
 
 void pin_as_output_A (uint8_t pin) {
@@ -203,7 +212,27 @@ void pin_off_A (uint8_t pin) {
   PORTA &= ~_BV(pin);
 }
 
-void pin_as_input_with_pull_up_C (uint8_t pin) {
-  DDRC &= ~_BV(pin);
-  PORTC |= _BV(pin);
+void pin_as_input_with_pull_up_D (uint8_t pin) {
+  DDRD &= ~_BV(pin);
+  PORTD |= _BV(pin);
+}
+
+void setup_irq_on_buttons_and_encoders (void) {
+    pcint_23_to_16_generate_interupt_on_pci2();
+    enable_interupt_from_buttons_and_encoders();
+    sei();
+}
+
+void pcint_23_to_16_generate_interupt_on_pci2 (void) {
+    PCICR |= _BV(PCIE2);
+}
+
+void enable_interupt_from_buttons_and_encoders (void) {
+    PCMSK2 |= 0b11111111;
+}
+
+ISR (PCINT2_vect) {
+  // IO pulled down means button pressed.
+  if (bit_is_clear(PIND, D_OE_SW))
+    set_status_H_S(H_other_handler, S_end_marker);
 }
