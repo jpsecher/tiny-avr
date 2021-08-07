@@ -15,6 +15,9 @@
 // PA1 --- +Green LED- --- GND
 #define A_CV_LED PA1
 
+// uC --- SW_PUSH --- GND
+#define C_OE_SW PC7
+
 #define SHORT_BLINK_ms 50
 #define LONG_BLINK_ms 450
 
@@ -53,7 +56,6 @@ INLINE uint8_t get_data_H_n (uint8_t handler, uint8_t index);
 INLINE void init_intr_handler_data (void);
 INLINE void sanity_check (void);
 INLINE void simulate_error (void);
-INLINE void error_loop (void);
 INLINE bool error_present (void);
 INLINE void show_all_errors (void);
 INLINE void show_error (uint8_t status);
@@ -61,17 +63,26 @@ INLINE void turn_off_output (void);
 INLINE void pin_as_output_A (uint8_t pin);
 INLINE void pin_on_A (uint8_t pin);
 INLINE void pin_off_A (uint8_t pin);
+INLINE void pin_as_input_with_pull_up_C (uint8_t pin);
+
 
 int main () {
   init_intr_handler_tables();
   ui_init();
   sanity_check();
-  simulate_error();  // <-------
-  while (error_present()) {
-    turn_off_output();
-    show_all_errors();
+  // simulate_error();  // <-------
+  while (1) {
+    while (error_present()) {
+      turn_off_output();
+      show_all_errors();
+      _delay_ms(LONG_BLINK_ms);
+    }
+    // Normal processing...
+    if (PINC & _BV(C_OE_SW))
+      pin_off_A(A_CV_LED);
+    else
+      pin_on_A(A_CV_LED);
   }
-  // Normal processing...
   return 0;
 }
 
@@ -89,13 +100,6 @@ bool error_present (void) {
       return true;
   }
   return false;
-}
-
-void error_loop (void) {
-  while (1) {
-    show_all_errors();
-    _delay_ms(LONG_BLINK_ms);
-  }
 }
 
 void show_all_errors (void) {
@@ -184,6 +188,7 @@ uint8_t get_data_H_n (uint8_t handler, uint8_t index) {
 void ui_init (void) {
   pin_as_output_A(A_CC_LED);
   pin_as_output_A(A_CV_LED);
+  pin_as_input_with_pull_up_C(C_OE_SW);
 }
 
 void pin_as_output_A (uint8_t pin) {
@@ -196,4 +201,9 @@ void pin_on_A (uint8_t pin) {
 
 void pin_off_A (uint8_t pin) {
   PORTA &= ~_BV(pin);
+}
+
+void pin_as_input_with_pull_up_C (uint8_t pin) {
+  DDRC &= ~_BV(pin);
+  PORTC |= _BV(pin);
 }
