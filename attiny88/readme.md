@@ -1,3 +1,6 @@
 # ATtiny 88
 
-    $ avrdude -c avrispmkii -p t10 
+## Connection test
+
+    $ avrdude -c avrispmkii -p t88
+
