@@ -257,15 +257,6 @@ void enable_interupt_from_buttons_and_encoders (void) {
   PCMSK2 |= 0b11111111;
 }
 
-#define OUTPUT_ENABLE 0b10000000
-#define SET_VOLTAGE   0b01000000
-#define SET_CURRENT   0b00100000
-#define VOLTAGE_DOWN  0b00010000
-#define VOLTAGE_UP    0b00001000
-#define CURRENT_DOWN  0b00000100
-#define CURRENT_UP    0b00000010
-
-
 void unknown_error (void) {
   set_status_H_S(H_sanity, S_unknown_error);
 }
