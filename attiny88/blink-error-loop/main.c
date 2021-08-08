@@ -49,12 +49,15 @@ enum Intr_Handler {
   H_buttons_and_encoders
 };
 
-#define N_INTR_HANDLERS 3
+#define N_INTR_HANDLERS 2
 uint8_t intr_handler_data_layout_H [N_INTR_HANDLERS];
 uint8_t intr_handler_to_data_index_H [N_INTR_HANDLERS];
 
-#define N_INTR_TOTAL_BYTES 5
+#define N_INTR_TOTAL_BYTES 3
 uint8_t intr_handler_data [N_INTR_TOTAL_BYTES];
+
+typedef void (*handler_t)(void);
+handler_t intr_handler_H [N_INTR_HANDLERS];
 
 #define INLINE static inline
 INLINE void ui_init (void);
@@ -105,20 +108,10 @@ void process_all_inputs (void) {
   uint8_t handler = 0;
   uint8_t status;
   for (; handler < N_INTR_HANDLERS; ++handler) {
-    cli();
     status = get_status_H(handler);
-    set_status_H_S(handler, S_ok);
-    sei();
     if (status == S_processing_needed)
-      //simulate_error(); // <---
-      switch (handler) {
-        case H_buttons_and_encoders: h_buttons_and_encoders(); break;
-      }
+      (*intr_handler_H[handler])();
   }
-  // if (bit_is_clear(PIND, D_OE_SW))
-  //   pin_on_A(A_CV_LED);
-  // else
-  //   pin_off_A(A_CV_LED);
 }
 
 bool error_present (void) {
@@ -187,12 +180,14 @@ void init_intr_handler_tables (void) {
 void init_sanity_handler (uint8_t handler) {
   // Only status byte for sanity check.
   intr_handler_data_layout_H[handler] = 1;
+  intr_handler_H[handler] = unknown_error;
 }
 
 void init_buttons_and_enoders_handler (uint8_t handler) {
   // Status byte and a bytes for the three buttons (3 bits) and direction of
   // the two encoders (2 * 2 bits).
-  intr_handler_data_layout_H[H_buttons_and_encoders] = 2;
+  intr_handler_data_layout_H[handler] = 2;
+  intr_handler_H[handler] = h_buttons_and_encoders;
 }
 
 void init_intr_handler_data (void) {
@@ -295,7 +290,22 @@ ISR (PCINT2_vect) {
 }
 
 void h_buttons_and_encoders (void) {
-  uint8_t state = get_data_H_n(H_buttons_and_encoders, 1);
-  if (state & OUTPUT_ENABLE)
-    unknown_error();
+  uint8_t state;
+  uint8_t status;
+  cli();
+  status = get_status_H(H_buttons_and_encoders);
+  state = get_data_H_n(H_buttons_and_encoders, 1);
+  set_status_H_S(H_buttons_and_encoders, S_ok);
+  sei();
+  // TODO:
+  if (state & OUTPUT_ENABLE) {
+    pin_on_A(A_CV_LED);
+    _delay_ms(LONG_BLINK_ms);
+  }
+  else
+    pin_off_A(A_CV_LED);
+  if (status != S_processing_needed)
+    pin_on_A(A_CC_LED);
+  else
+    pin_off_A(A_CC_LED);
 }
