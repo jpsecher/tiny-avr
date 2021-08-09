@@ -1,5 +1,4 @@
 #define F_CPU 8000000
-
 #include <avr/interrupt.h>
 #include <avr/io.h>
 #include <util/delay.h>
@@ -22,6 +21,13 @@
 
 // uC --- SW_PUSH --- GND
 #define D_OE_SW PD2
+
+// PD0 --- EncoderA --- GND
+#define D_V_ENC_A PD0
+
+// PD1 --- EncoderB --- GND
+#define D_V_ENC_B PD1
+
 
 #define SHORT_BLINK_ms 50
 #define LONG_BLINK_ms 450

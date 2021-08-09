@@ -15,11 +15,11 @@
 // PA1 --- +Green LED- --- GND
 #define A_CV_LED PA1
 
-// PD0 --- EncoderA --- GND
-#define D_V_ENC_A PD0
+// PD0 --- EncoderB --- GND
+#define D_V_ENC_B PD0
 
-// PD1 --- EncoderB --- GND
-#define D_V_ENC_B PD1
+// PD1 --- EncoderA --- GND
+#define D_V_ENC_A PD1
 
 #define INLINE static inline
 INLINE void ui_init (void);
@@ -56,7 +56,7 @@ void translate_encoder (bool a, bool b) {
   bool counter_clockwise = false;
   if (a != last_A || b != last_B)
   {
-    // 00 -> 01 -> 11 -> 10 -> ... = counter clockwise rotation.
+    // 00 -> 01 -> 11 -> 10 -> ... = clockwise rotation.
     if (
       (!last_A && !last_B && !a && b) ||
       (!last_A && last_B && a && b) ||
@@ -64,9 +64,9 @@ void translate_encoder (bool a, bool b) {
       (last_A && !last_B && !a && !b)
     )
     {
-      counter_clockwise = true;
+      clockwise = true;
     }
-    // 01 -> 00 -> 10 -> 11 -> ... = clockwise rotation.
+    // 01 -> 00 -> 10 -> 11 -> ... = counter clockwise rotation.
     else if (
       (!last_A && last_B && !a && !b) ||
       (!last_A && !last_B && a && !b) ||
@@ -74,7 +74,7 @@ void translate_encoder (bool a, bool b) {
       (last_A && last_B && !a && b)
     )
     {
-      clockwise = true;
+      counter_clockwise = true;
     }
     last_A = a;
     last_B = b;
