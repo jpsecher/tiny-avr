@@ -17,6 +17,9 @@
       , { "name": "encoder"
         , "working_dir": "${project_path}/../attiny88/encoder"
         }
+      , { "name": "lab-psu"
+        , "working_dir": "${project_path}/../attiny88/lab-psu"
+        }
       ]
     }
   ]
