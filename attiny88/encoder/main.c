@@ -9,40 +9,41 @@
 // Connections
 //
 
-// PA0 --- +Red LED- --- GND
-#define A_CC_LED PA0
+//  PD6 --- +LED(R)- --- GND
+#define D_CC_LED PD6
 
-// PA1 --- +Green LED- --- GND
-#define A_CV_LED PA1
+//  PD7 --- +LED(G)- --- GND
+#define D_CV_LED PD7
 
-// PD0 --- EncoderB --- GND
-#define D_V_ENC_B PD0
 
-// PD1 --- EncoderA --- GND
-#define D_V_ENC_A PD1
+// PB0 --- EncoderB --- GND
+#define B_V_ENC_B PB0
+
+// PB1 --- EncoderA --- GND
+#define B_V_ENC_A PB1
 
 #define INLINE static inline
 INLINE void ui_init (void);
-INLINE void pin_as_output_A (uint8_t pin);
-INLINE void pin_on_A (uint8_t pin);
-INLINE void pin_off_A (uint8_t pin);
-INLINE void pin_as_input_with_pull_up_D (uint8_t pin);
-INLINE void setup_irq_on_buttons_and_encoders (void);
-INLINE void pcint_23_to_16_generate_interupt_on_pci2 (void);
-INLINE void enable_interupt_from_buttons_and_encoders (void);
+INLINE void pin_as_output_D (uint8_t pin);
+INLINE void pin_on_D (uint8_t pin);
+INLINE void pin_off_D (uint8_t pin);
+INLINE void pin_as_input_with_pull_up_B (uint8_t pin);
+INLINE void setup_irq_on_encoder (void);
+INLINE void pcint_7_to_0_generate_interupt_on_pci0 (void);
+INLINE void enable_interupt_from_encoder (void);
 INLINE void translate_encoder (bool a, bool b);
 
 bool a;
 bool b;
 
-ISR (PCINT2_vect) {
-  a = bit_is_set(PIND, D_V_ENC_A);
-  b = bit_is_set(PIND, D_V_ENC_B);
+ISR (PCINT0_vect) {
+  a = bit_is_set(PINB, B_V_ENC_A);
+  b = bit_is_set(PINB, B_V_ENC_B);
 }
 
 int main () {
   ui_init();
-  setup_irq_on_buttons_and_encoders();
+  setup_irq_on_encoder();
   while (1) {
     translate_encoder(a, b);
   }
@@ -80,50 +81,50 @@ void translate_encoder (bool a, bool b) {
     last_B = b;
   }
   if (clockwise)
-    pin_on_A(A_CV_LED);
+    pin_on_D(D_CV_LED);
   else
-    pin_off_A(A_CV_LED);
+    pin_off_D(D_CV_LED);
   if (counter_clockwise)
-    pin_on_A(A_CC_LED);
+    pin_on_D(D_CC_LED);
   else
-    pin_off_A(A_CC_LED);
+    pin_off_D(D_CC_LED);
   _delay_ms(5);
 }
 
 void ui_init (void) {
-  pin_as_output_A(A_CC_LED);
-  pin_as_output_A(A_CV_LED);
-  pin_as_input_with_pull_up_D(D_V_ENC_A);
-  pin_as_input_with_pull_up_D(D_V_ENC_B);
+  pin_as_output_D(D_CC_LED);
+  pin_as_output_D(D_CV_LED);
+  pin_as_input_with_pull_up_B(B_V_ENC_A);
+  pin_as_input_with_pull_up_B(B_V_ENC_B);
 }
 
-void pin_as_output_A (uint8_t pin) {
-  DDRA |= _BV(pin);
+void pin_as_output_D (uint8_t pin) {
+  DDRD |= _BV(pin);
 }
 
-void pin_on_A (uint8_t pin) {
-  PORTA |= _BV(pin);
-}
-
-void pin_off_A (uint8_t pin) {
-  PORTA &= ~_BV(pin);
-}
-
-void pin_as_input_with_pull_up_D (uint8_t pin) {
-  DDRD &= ~_BV(pin);
+void pin_on_D (uint8_t pin) {
   PORTD |= _BV(pin);
 }
 
-void setup_irq_on_buttons_and_encoders (void) {
-  pcint_23_to_16_generate_interupt_on_pci2();
-  enable_interupt_from_buttons_and_encoders();
+void pin_off_D (uint8_t pin) {
+  PORTD &= ~_BV(pin);
+}
+
+void pin_as_input_with_pull_up_B (uint8_t pin) {
+  DDRB &= ~_BV(pin);
+  PORTB |= _BV(pin);
+}
+
+void setup_irq_on_encoder (void) {
+  pcint_7_to_0_generate_interupt_on_pci0();
+  enable_interupt_from_encoder();
   sei();
 }
 
-void pcint_23_to_16_generate_interupt_on_pci2 (void) {
-  PCICR |= _BV(PCIE2);
+void pcint_7_to_0_generate_interupt_on_pci0 (void) {
+  PCICR |= _BV(PCIE0);
 }
 
-void enable_interupt_from_buttons_and_encoders (void) {
-  PCMSK2 |= 0b11111111;
+void enable_interupt_from_encoder (void) {
+  PCMSK0 |= 0b11111111;
 }
