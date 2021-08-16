@@ -7,11 +7,7 @@
   PD3 --- LCD_E
   PD4 --- LCD_RS
   PD5 --- LCD_DB4
-  PD6 --- +LED(R)- --- GND
-  PD7 --- +LED(G)- --- GND
 */
-
-// See https://github.com/arduino-libraries/LiquidCrystal
 
 // It is important that these four data pins are in this order
 #define D_LCD_DB4 PD0
@@ -21,8 +17,6 @@
 
 #define D_LCD_RS PD4
 #define D_LCD_EN PD5
-//#define D_CC_LED PD6
-//#define D_CV_LED PD7
 
 #define F_CPU 8000000
 
@@ -38,6 +32,8 @@ INLINE void lcd_command (uint8_t value);
 INLINE void lcd_write (uint8_t value);
 INLINE void lcd_clear (void);
 INLINE void lcd_display (void);
+INLINE void lcd_blinkCursor();
+INLINE void lcd_invisibleCursor();
 INLINE void lcd_pulseEnable (void);
 INLINE void all_pin_Ds_as_output (void);
 INLINE void pin_on_D (uint8_t pin);
@@ -51,7 +47,14 @@ int main (void) {
   lcd_setCursor(0, 0);
   lcd_print("hello world");
   lcd_setCursor(0, 1);
-  lcd_print("v2");
+  lcd_print("v4");
+  lcd_setCursor(15, 1);
+  while (1) {
+    lcd_blinkCursor();
+    _delay_ms(2000);
+    lcd_invisibleCursor();
+    _delay_ms(2000);
+  }
   return 0;
 }
 
@@ -109,6 +112,14 @@ void lcd_setCursor(uint8_t col, uint8_t row)
 {
   uint8_t row_offset = row ? 0x40 : 0x00;
   lcd_command(LCD_SETDDRAMADDR | (col + row_offset));
+}
+
+void lcd_blinkCursor() {
+  lcd_command(LCD_DISPLAYCONTROL | LCD_2LINE | LCD_DISPLAYON | LCD_BLINKON);
+}
+
+void lcd_invisibleCursor() {
+  lcd_command(LCD_DISPLAYCONTROL | LCD_2LINE | LCD_DISPLAYON);
 }
 
 void lcd_display (void) {
