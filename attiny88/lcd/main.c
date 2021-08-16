@@ -39,16 +39,35 @@ INLINE void lcd_pulse_enable (void);
 INLINE void all_pin_Ds_as_output (void);
 INLINE void pin_on_D (uint8_t pin);
 INLINE void pin_off_D (uint8_t pin);
-INLINE void lcd_print (char const *);
+
+void lcd_print (char const *);
+void lcd_create_character (uint8_t location, uint8_t const * map);
+
+void lcd_create_heart (void) {
+  uint8_t raster[8] = {
+    0b00000,
+    0b00000,
+    0b01010,
+    0b11111,
+    0b11111,
+    0b01110,
+    0b00100,
+    0b00000
+  };
+  lcd_create_character(0, raster);
+}
 
 int main (void) {
   all_pin_Ds_as_output();
   lcd_init();
   lcd_clear();
+  lcd_create_heart();
   lcd_setCursor(0, 0);
   lcd_print("hello world");
   lcd_setCursor(0, 1);
-  lcd_print("v4");
+  lcd_print("v5");
+  lcd_setCursor(15, 0);
+  lcd_write(0);
   lcd_setCursor(15, 1);
   while (1) {
     lcd_solid_cursor();
@@ -109,6 +128,14 @@ void lcd_init (void) {
   lcd_clear();
   // Initialize to default text direction (for romance languages)
   lcd_command(LCD_ENTRYMODESET | LCD_ENTRYLEFT);
+}
+
+// Allows us to fill the first 8 CGRAM locations with custom characters
+void lcd_create_character (uint8_t location, uint8_t const * map) {
+  location &= 0x7; // we only have 8 locations 0-7
+  lcd_command(LCD_SETCGRAMADDR | (location << 3));
+  for (uint8_t i = 0; i < 8; ++i)
+    lcd_write(map[i]);
 }
 
 void lcd_setCursor (uint8_t col, uint8_t row)
