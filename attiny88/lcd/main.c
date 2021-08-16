@@ -32,9 +32,10 @@ INLINE void lcd_command (uint8_t value);
 INLINE void lcd_write (uint8_t value);
 INLINE void lcd_clear (void);
 INLINE void lcd_display (void);
-INLINE void lcd_blinkCursor();
-INLINE void lcd_invisibleCursor();
-INLINE void lcd_pulseEnable (void);
+INLINE void lcd_solid_cursor (void);
+INLINE void lcd_blink_cursor();
+INLINE void lcd_invisible_cursor();
+INLINE void lcd_pulse_enable (void);
 INLINE void all_pin_Ds_as_output (void);
 INLINE void pin_on_D (uint8_t pin);
 INLINE void pin_off_D (uint8_t pin);
@@ -50,9 +51,11 @@ int main (void) {
   lcd_print("v4");
   lcd_setCursor(15, 1);
   while (1) {
-    lcd_blinkCursor();
+    lcd_solid_cursor();
     _delay_ms(2000);
-    lcd_invisibleCursor();
+    lcd_blink_cursor();
+    _delay_ms(2000);
+    lcd_invisible_cursor();
     _delay_ms(2000);
   }
   return 0;
@@ -108,17 +111,21 @@ void lcd_init (void) {
   lcd_command(LCD_ENTRYMODESET | LCD_ENTRYLEFT);
 }
 
-void lcd_setCursor(uint8_t col, uint8_t row)
+void lcd_setCursor (uint8_t col, uint8_t row)
 {
   uint8_t row_offset = row ? 0x40 : 0x00;
   lcd_command(LCD_SETDDRAMADDR | (col + row_offset));
 }
 
-void lcd_blinkCursor() {
+void lcd_blink_cursor (void) {
   lcd_command(LCD_DISPLAYCONTROL | LCD_2LINE | LCD_DISPLAYON | LCD_BLINKON);
 }
 
-void lcd_invisibleCursor() {
+void lcd_solid_cursor (void) {
+  lcd_command(LCD_DISPLAYCONTROL | LCD_2LINE | LCD_DISPLAYON | LCD_CURSORON);
+}
+
+void lcd_invisible_cursor (void) {
   lcd_command(LCD_DISPLAYCONTROL | LCD_2LINE | LCD_DISPLAYON);
 }
 
@@ -146,10 +153,10 @@ void lcd_write (uint8_t value) {
 
 void lcd_write4bits (uint8_t value) {
   PORTD = (PORTD & 0xF0) | (value & 0x0F);
-  lcd_pulseEnable();
+  lcd_pulse_enable();
 }
 
-void lcd_pulseEnable (void) {
+void lcd_pulse_enable (void) {
   pin_off_D(D_LCD_EN);
   _delay_us(1);  // >140 ns
   pin_on_D(D_LCD_EN);
