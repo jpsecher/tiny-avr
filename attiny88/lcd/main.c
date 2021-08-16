@@ -57,16 +57,46 @@ void lcd_create_heart (void) {
   lcd_create_character(0, raster);
 }
 
+void lcd_create_oe (void) {
+  uint8_t raster[8] = {
+    0b00000,
+    0b00000,
+    0b01110,
+    0b10011,
+    0b10101,
+    0b11001,
+    0b01110,
+    0b00000
+  };
+  lcd_create_character(1, raster);
+}
+
+void lcd_create_ae (void) {
+  uint8_t raster[8] = {
+    0b00000,
+    0b00000,
+    0b11010,
+    0b00101,
+    0b01110,
+    0b10100,
+    0b01011,
+    0b00000
+  };
+  lcd_create_character(2, raster);
+}
+
 int main (void) {
   all_pin_Ds_as_output();
   lcd_init();
   lcd_clear();
   lcd_create_heart();
+  lcd_create_oe();
+  lcd_create_ae();
   lcd_setCursor(0, 0);
-  lcd_print("hello world");
+  lcd_print("  Du er l\2kker");
   lcd_setCursor(0, 1);
-  lcd_print("v5");
-  lcd_setCursor(15, 0);
+  lcd_print("    og s\1d");
+  lcd_setCursor(11, 1);
   lcd_write(0);
   lcd_setCursor(15, 1);
   while (1) {
