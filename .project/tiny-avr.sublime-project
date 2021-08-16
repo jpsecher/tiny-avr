@@ -20,6 +20,9 @@
       , { "name": "lab-psu"
         , "working_dir": "${project_path}/../attiny88/lab-psu"
         }
+      , { "name": "lcd"
+        , "working_dir": "${project_path}/../attiny88/lcd"
+        }
       ]
     }
   ]

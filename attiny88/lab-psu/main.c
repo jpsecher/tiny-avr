@@ -6,7 +6,7 @@
 #include <stdbool.h>
 
 //
-// Connections
+// Connections (NOT CORRECT)
 // ===========
 //
 // All buttons & encoder use PCI2 (pins PDx).
