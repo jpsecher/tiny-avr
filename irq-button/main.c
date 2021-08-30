@@ -17,8 +17,8 @@ INLINE void portb_pin_on (uint8_t pin);
 INLINE void portb_pin_off (uint8_t pin);
 
 void setup_irq_on_push_button();
-void pcint_17_to_11_generate_interupt_on_pcint2();
-void enable_interupt_from_button();
+void pcint_17_to_11_generate_interrupt_on_pcint2();
+void enable_interrupt_from_button();
 
 struct {
     uint8_t button_pressed : 1;
@@ -50,16 +50,16 @@ int main ()
 }
 
 void setup_irq_on_push_button () {
-    pcint_17_to_11_generate_interupt_on_pcint2();
-    enable_interupt_from_button();
+    pcint_17_to_11_generate_interrupt_on_pcint2();
+    enable_interrupt_from_button();
     sei();
 }
 
-void pcint_17_to_11_generate_interupt_on_pcint2 () {
+void pcint_17_to_11_generate_interrupt_on_pcint2 () {
     GIMSK |= _BV(PCIE2);
 }
 
-void enable_interupt_from_button () {
+void enable_interrupt_from_button () {
     PCMSK2 |= _BV(PCINT16);
 }
 

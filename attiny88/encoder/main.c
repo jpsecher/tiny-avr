@@ -29,8 +29,8 @@ INLINE void pin_on_D (uint8_t pin);
 INLINE void pin_off_D (uint8_t pin);
 INLINE void pin_as_input_with_pull_up_B (uint8_t pin);
 INLINE void setup_irq_on_encoder (void);
-INLINE void pcint_7_to_0_generate_interupt_on_pci0 (void);
-INLINE void enable_interupt_from_encoder (void);
+INLINE void pcint_7_to_0_generate_interrupt_on_pci0 (void);
+INLINE void enable_interrupt_from_encoder (void);
 INLINE void translate_encoder (bool a, bool b);
 
 bool a;
@@ -116,15 +116,15 @@ void pin_as_input_with_pull_up_B (uint8_t pin) {
 }
 
 void setup_irq_on_encoder (void) {
-  pcint_7_to_0_generate_interupt_on_pci0();
-  enable_interupt_from_encoder();
+  pcint_7_to_0_generate_interrupt_on_pci0();
+  enable_interrupt_from_encoder();
   sei();
 }
 
-void pcint_7_to_0_generate_interupt_on_pci0 (void) {
+void pcint_7_to_0_generate_interrupt_on_pci0 (void) {
   PCICR |= _BV(PCIE0);
 }
 
-void enable_interupt_from_encoder (void) {
+void enable_interrupt_from_encoder (void) {
   PCMSK0 |= 0b11111111;
 }

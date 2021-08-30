@@ -78,8 +78,8 @@ INLINE void pin_on_D (uint8_t pin);
 INLINE void pin_off_D (uint8_t pin);
 INLINE void pin_as_input_with_pull_up_B (uint8_t pin);
 INLINE void setup_irq_on_button (void);
-INLINE void pcint_7_to_0_generate_interupt_on_pci0 (void);
-INLINE void enable_interupt_from_buttons (void);
+INLINE void pcint_7_to_0_generate_interrupt_on_pci0 (void);
+INLINE void enable_interrupt_from_buttons (void);
 INLINE void init_sanity_handler (uint8_t handler);
 INLINE void init_button_handler (uint8_t handler);
 
@@ -240,18 +240,18 @@ void pin_as_input_with_pull_up_B (uint8_t pin) {
 }
 
 void setup_irq_on_button (void) {
-  pcint_7_to_0_generate_interupt_on_pci0();
-  enable_interupt_from_buttons();
+  pcint_7_to_0_generate_interrupt_on_pci0();
+  enable_interrupt_from_buttons();
   sei();
 }
 
-void pcint_7_to_0_generate_interupt_on_pci0 (void) {
+void pcint_7_to_0_generate_interrupt_on_pci0 (void) {
   PCICR |= _BV(PCIE0);
 }
 
-void enable_interupt_from_buttons (void) {
-  // TODO: only B_OE_SW should generate intr
-  PCMSK0 |= 0b11111111;
+void enable_interrupt_from_buttons (void) {
+  // B_OE_SW == PCINT2 will generate interrupt.
+  PCMSK0 |= _BV(PCINT2);
 }
 
 //
@@ -282,3 +282,9 @@ void h_button (void) {
       pin_off_D(D_CV_LED);
   }
 }
+
+
+//
+// DAC
+//
+

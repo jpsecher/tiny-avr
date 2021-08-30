@@ -14,7 +14,7 @@ INLINE void reset_time();
 INLINE void clear_timer_on_compare_mode();
 INLINE void match_every_1ms();
 INLINE void scale_clock_down_by_1024();
-INLINE void interupt_on_match();
+INLINE void interrupt_on_match();
 INLINE uint32_t time_ms();
 
 int main ()
@@ -39,7 +39,7 @@ void setup_fast_timer () {
     scale_clock_down_by_1024();
     clear_timer_on_compare_mode();
     match_every_1ms();
-    interupt_on_match();
+    interrupt_on_match();
     sei();
 }
 
@@ -51,7 +51,7 @@ void clear_timer_on_compare_mode () {
     TCCR0A |= _BV(WGM01);
 }
 
-void interupt_on_match () {
+void interrupt_on_match () {
     TIMSK |= _BV(OCIE0A);
 }
 

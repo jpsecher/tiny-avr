@@ -88,8 +88,8 @@ INLINE void pin_on_A (uint8_t pin);
 INLINE void pin_off_A (uint8_t pin);
 INLINE void pin_as_input_with_pull_up_D (uint8_t pin);
 INLINE void setup_irq_on_buttons_and_encoders (void);
-INLINE void pcint_23_to_16_generate_interupt_on_pci2 (void);
-INLINE void enable_interupt_from_buttons_and_encoders (void);
+INLINE void pcint_23_to_16_generate_interrupt_on_pci2 (void);
+INLINE void enable_interrupt_from_buttons_and_encoders (void);
 INLINE void init_sanity_handler (uint8_t handler);
 INLINE void init_buttons_and_enoders_handler (uint8_t handler);
 
@@ -253,16 +253,16 @@ void pin_as_input_with_pull_up_D (uint8_t pin) {
 }
 
 void setup_irq_on_buttons_and_encoders (void) {
-  pcint_23_to_16_generate_interupt_on_pci2();
-  enable_interupt_from_buttons_and_encoders();
+  pcint_23_to_16_generate_interrupt_on_pci2();
+  enable_interrupt_from_buttons_and_encoders();
   sei();
 }
 
-void pcint_23_to_16_generate_interupt_on_pci2 (void) {
+void pcint_23_to_16_generate_interrupt_on_pci2 (void) {
   PCICR |= _BV(PCIE2);
 }
 
-void enable_interupt_from_buttons_and_encoders (void) {
+void enable_interrupt_from_buttons_and_encoders (void) {
   PCMSK2 |= 0b11111111;
 }
 
