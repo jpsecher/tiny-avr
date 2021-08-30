@@ -1,35 +1,33 @@
+//
+// Connections
+// ===========
+//
+// All buttons & encoder use PCI2 (pins PDx).
+// LEDs on PAx.
+//
+
+// PA0 --- +Red LED- --- GND
+#define A_CC_LED PA0
+
+// PA1 --- +Green LED- --- GND
+#define A_CV_LED PA1
+
+// PB2 --- SW_PUSH --- GND
+// PD2 --- SW_PUSH --- GND
+#define B_OE_SW PB2
+
+// PC4 --- SDA:MCP4725
+// PC5 --- SCL:MCP4725
+#define C_SDA PC4
+#define C_SCL PC5
+
+
 #define F_CPU 8000000
 #include <avr/interrupt.h>
 #include <avr/io.h>
 #include <util/delay.h>
 #include <string.h>
 #include <stdbool.h>
-
-//
-// This demo will signal two errors when the button is pressed.   The error
-// codes are displayed in binary by 0 as short green blink and 1 as long green
-// blink, LSB first.  Between errors, a long red blink will occur.
-//
-
-
-//
-// Connections
-// ===========
-//
-// All buttons & encoder use PCI0 (pins PBx).
-// LEDs on PDx.
-//
-
-
-//  PD6 --- +LED(R)- --- GND
-#define D_CC_LED PD6
-
-//  PD7 --- +LED(G)- --- GND
-#define D_CV_LED PD7
-
-
-// PB2 --- SW_PUSH --- GND
-#define B_OE_SW PB2
 
 //
 // Timings
@@ -75,13 +73,13 @@ INLINE bool error_present (void);
 INLINE void show_all_errors (void);
 INLINE void show_error (uint8_t status);
 INLINE void process_all_events (void);
-INLINE void pin_as_output_D (uint8_t pin);
-INLINE void pin_on_D (uint8_t pin);
-INLINE void pin_off_D (uint8_t pin);
+INLINE void pin_as_output_A (uint8_t pin);
+INLINE void pin_on_A (uint8_t pin);
+INLINE void pin_off_A (uint8_t pin);
 INLINE void pin_as_input_with_pull_up_B (uint8_t pin);
 INLINE void setup_irq_on_button (void);
 INLINE void pcint_7_to_0_generate_interupt_on_pci0 (void);
-INLINE void enable_interupt_from_button (void);
+INLINE void enable_interupt_from_buttons (void);
 INLINE void init_sanity_handler (uint8_t handler);
 INLINE void init_button_handler (uint8_t handler);
 
@@ -138,22 +136,22 @@ void show_all_errors (void) {
 }
 
 void show_error (uint8_t status) {
-  pin_off_D(D_CV_LED);
+  pin_off_A(A_CV_LED);
   // Blink red to signal error.
-  pin_on_D(D_CC_LED);
+  pin_on_A(A_CC_LED);
   _delay_ms(LONG_BLINK_ms);
-  pin_off_D(D_CC_LED);
+  pin_off_A(A_CC_LED);
   _delay_ms(LONG_BLINK_ms);
   while (status != 0) {
     // Blink green, short for 0, long for 1.
-    pin_on_D(D_CV_LED);
+    pin_on_A(A_CV_LED);
     if ((status & 1) == 1) {
       _delay_ms(LONG_BLINK_ms);
-      pin_off_D(D_CV_LED);
+      pin_off_A(A_CV_LED);
     }
     else {
       _delay_ms(SHORT_BLINK_ms);
-      pin_off_D(D_CV_LED);
+      pin_off_A(A_CV_LED);
     }
     _delay_ms(LONG_BLINK_ms);
     status >>= 1;
@@ -185,7 +183,7 @@ void init_sanity_handler (uint8_t handler) {
 }
 
 void init_button_handler (uint8_t handler) {
-  // Status byte and a byte for the button (1 bit).
+  // Status byte and a bytes for the button (1 bit).
   intr_handler_data_layout_H[handler] = 2;
   intr_handler_H[handler] = h_button;
 }
@@ -217,21 +215,21 @@ uint8_t get_data_H_n (uint8_t handler, uint8_t index) {
 }
 
 void ui_init (void) {
-  pin_as_output_D(D_CC_LED);
-  pin_as_output_D(D_CV_LED);
+  pin_as_output_A(A_CC_LED);
+  pin_as_output_A(A_CV_LED);
   pin_as_input_with_pull_up_B(B_OE_SW);
 }
 
-void pin_as_output_D (uint8_t pin) {
-  DDRD |= _BV(pin);
+void pin_as_output_A (uint8_t pin) {
+  DDRA |= _BV(pin);
 }
 
-void pin_on_D (uint8_t pin) {
-  PORTD |= _BV(pin);
+void pin_on_A (uint8_t pin) {
+  PORTA |= _BV(pin);
 }
 
-void pin_off_D (uint8_t pin) {
-  PORTD &= ~_BV(pin);
+void pin_off_A (uint8_t pin) {
+  PORTA &= ~_BV(pin);
 }
 
 void pin_as_input_with_pull_up_B (uint8_t pin) {
@@ -241,7 +239,7 @@ void pin_as_input_with_pull_up_B (uint8_t pin) {
 
 void setup_irq_on_button (void) {
   pcint_7_to_0_generate_interupt_on_pci0();
-  enable_interupt_from_button();
+  enable_interupt_from_buttons();
   sei();
 }
 
@@ -249,9 +247,9 @@ void pcint_7_to_0_generate_interupt_on_pci0 (void) {
   PCICR |= _BV(PCIE0);
 }
 
-void enable_interupt_from_button (void) {
-  // B_OE_SW == PCINT2 will generate interrupt.
-  PCMSK0 |= _BV(PCINT2);
+void enable_interupt_from_buttons (void) {
+  // TODO: only B_OE_SW should generate intr
+  PCMSK0 |= 0b11111111;
 }
 
 //
@@ -274,7 +272,6 @@ void h_button (void) {
   set_status_H_S(H_button, S_ok);
   sei();
   if (status == S_processing_needed)
-    // Generate error when button pressed
     if (state)
       simulate_error();
 }

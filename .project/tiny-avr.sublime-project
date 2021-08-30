@@ -23,6 +23,9 @@
       , { "name": "lcd"
         , "working_dir": "${project_path}/../attiny88/lcd"
         }
+      , { "name": "dac-i2c"
+        , "working_dir": "${project_path}/../attiny88/dac-i2c"
+        }
       ]
     }
   ]
