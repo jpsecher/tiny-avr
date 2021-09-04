@@ -21,6 +21,7 @@
 // PC5 --- SCL:MCP4725
 #define C_SDA PC4
 #define C_SCL PC5
+#define DAC_ADDR 0b1100000
 
 
 #define F_CPU 8000000
@@ -48,17 +49,25 @@ enum Status {
 enum Intr_Handler {
   H_sanity,
   H_button,
+  H_twi,
 };
 
-#define N_INTR_HANDLERS 2
+// Has to match the number of interrupt handlers listed above.
+#define N_INTR_HANDLERS 3
 uint8_t intr_handler_data_layout_H [N_INTR_HANDLERS];
 uint8_t intr_handler_to_data_index_H [N_INTR_HANDLERS];
 
-#define N_INTR_TOTAL_BYTES 3
+// Has to match (or exceed) number of bytes reserved for all interrupt handlers.
+#define N_INTR_TOTAL_BYTES 11
 uint8_t intr_handler_data [N_INTR_TOTAL_BYTES];
 
 typedef void (*handler_t)(void);
 handler_t intr_handler_H [N_INTR_HANDLERS];
+
+// Common return values.
+#define SUCCESS 0
+#define FAIL 1
+#define common uint8_t
 
 #define INLINE static inline
 INLINE void ui_init (void);
@@ -82,10 +91,15 @@ INLINE void pcint_7_to_0_generate_interrupt_on_pci0 (void);
 INLINE void enable_interrupt_from_buttons (void);
 INLINE void init_sanity_handler (uint8_t handler);
 INLINE void init_button_handler (uint8_t handler);
+INLINE void init_twi_handler (uint8_t handler);
+INLINE void setup_twi_normal_speed_master_transfer (void);
+INLINE common twi_send_16_bit (uint8_t slave, uint16_t value);
+
 
 // Functions tied to specific Intr_Handlers.
 void unknown_error (void);
 void h_button (void);
+void h_twi (void);
 
 int main () {
   init_intr_handler_tables();
@@ -171,6 +185,7 @@ void sanity_check (void) {
 void init_intr_handler_tables (void) {
   init_sanity_handler(H_sanity);
   init_button_handler(H_button);
+  init_twi_handler(H_twi);
   init_intr_handler_data();
 };
 
@@ -188,6 +203,18 @@ void init_button_handler (uint8_t handler) {
   // Status byte and a bytes for the button (1 bit).
   intr_handler_data_layout_H[handler] = 2;
   intr_handler_H[handler] = h_button;
+}
+
+void init_twi_handler (uint8_t handler) {
+# define TWI_MAX_BYTES_N 4
+  // Status byte, state, slave address, bytes to send, and array of 4 bytes for data.
+# define TWI_STATE 1
+# define TWI_SLAVE_ADDR 2
+# define TWI_BYTES_N 3
+# define TWI_BYTE_ARRAY 4
+  intr_handler_data_layout_H[handler] = 8;
+  intr_handler_H[handler] = h_twi;
+  setup_twi_normal_speed_master_transfer();
 }
 
 void init_intr_handler_data (void) {
@@ -283,6 +310,49 @@ void h_button (void) {
   }
 }
 
+
+//
+// TWI / DAC
+//
+
+enum Twi_State {
+  // Values have to match index in data array:
+  TS_sending_0,
+  TS_sending_1,
+  TS_sending_2,
+  TS_sending_3,
+  // The remaining values are unimportant:
+  TS_addressing,
+  TS_starting,
+  TS_idle,
+};
+
+ISR (TWI_vect) {
+  // TODO: check status, change state
+}
+
+void h_twi () {
+  // TODO:
+}
+
+common twi_send_16_bit (uint8_t slave, uint16_t value) {
+  if (get_data_H_n(H_twi, TWI_STATE) != TS_idle) {
+    return FAIL;
+  }
+  set_data_H_n_b(H_twi, TWI_SLAVE_ADDR, slave);
+  set_data_H_n_b(H_twi, TWI_BYTES_N, 2);
+  set_data_H_n_b(H_twi, TWI_BYTE_ARRAY, (value >> 8));
+  set_data_H_n_b(H_twi, TWI_BYTE_ARRAY+1, (value & 0xFF));
+  return SUCCESS;
+}
+
+void setup_twi_normal_speed_master_transfer (void) {
+  // f_SCL = 8MHz / (16 + (2 * 10 * 4)) ~= 83kHz
+  TWBR = 10;  // Divide by 10
+  TWSR |= 0b01;  // Divide by 4
+  // Start idle.
+  set_data_H_n_b(H_twi, TWI_STATE, TS_idle);
+}
 
 //
 // DAC
