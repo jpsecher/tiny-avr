@@ -39,11 +39,16 @@
 
 enum Status {
   // Non-errors.
-  S_ok,
-  S_processing_needed,
-  // Errors.
-  S_memory_layout_error,
-  S_unknown_error
+  S_ok = 0,
+  S_processing_needed = 1,
+  // System errors.
+  S_memory_layout_error = 2,
+  S_unknown_error = 3,
+  // TWI errors.
+  S_twi_idle_intr = 4,
+  S_twi_start_failed = 5,
+  S_twi_unknown = 6,
+  S_twi_slave_not_ready = 7,
 };
 
 enum Intr_Handler {
@@ -67,7 +72,8 @@ handler_t intr_handler_H [N_INTR_HANDLERS];
 // Common return values.
 #define SUCCESS 0
 #define FAIL 1
-#define common uint8_t
+#define BUSY 2
+#define return_t uint8_t
 
 #define INLINE static inline
 INLINE void ui_init (void);
@@ -93,19 +99,35 @@ INLINE void init_sanity_handler (uint8_t handler);
 INLINE void init_button_handler (uint8_t handler);
 INLINE void init_twi_handler (uint8_t handler);
 INLINE void setup_twi_normal_speed_master_transfer (void);
-INLINE common twi_send_16_bit (uint8_t slave, uint16_t value);
+INLINE void twi_start (void);
+INLINE void twi_addr_w (void);
+INLINE return_t twi_send_16_bit (uint8_t slave, uint16_t value);
+INLINE void twi_first_byte (void);
+INLINE void twi_next_byte (void);
+INLINE void twi_stop (void);
+INLINE void twi_acknowledge_interrupt (void);
 
+void twi_abort_with_error (uint8_t error);
 
 // Functions tied to specific Intr_Handlers.
 void unknown_error (void);
 void h_button (void);
 void h_twi (void);
 
+# define TWI_MAX_BYTES_N 4
+# define TWI_STATE 1
+# define TWI_SLAVE_ADDR 2
+# define TWI_BYTES_N 3
+# define TWI_BYTE_ARRAY 4
+
+
 int main () {
   init_intr_handler_tables();
   ui_init();
   setup_irq_on_button();
+  setup_twi_normal_speed_master_transfer();
   sanity_check();
+  sei();
   while (1) {
     while (error_present()) {
       show_all_errors();
@@ -206,15 +228,9 @@ void init_button_handler (uint8_t handler) {
 }
 
 void init_twi_handler (uint8_t handler) {
-# define TWI_MAX_BYTES_N 4
   // Status byte, state, slave address, bytes to send, and array of 4 bytes for data.
-# define TWI_STATE 1
-# define TWI_SLAVE_ADDR 2
-# define TWI_BYTES_N 3
-# define TWI_BYTE_ARRAY 4
   intr_handler_data_layout_H[handler] = 8;
   intr_handler_H[handler] = h_twi;
-  setup_twi_normal_speed_master_transfer();
 }
 
 void init_intr_handler_data (void) {
@@ -269,7 +285,6 @@ void pin_as_input_with_pull_up_B (uint8_t pin) {
 void setup_irq_on_button (void) {
   pcint_7_to_0_generate_interrupt_on_pci0();
   enable_interrupt_from_buttons();
-  sei();
 }
 
 void pcint_7_to_0_generate_interrupt_on_pci0 (void) {
@@ -303,16 +318,16 @@ void h_button (void) {
   set_data_H_n_b(H_button, 1, 0x00);
   sei();
   if (status == S_processing_needed) {
-    if (state)
-      pin_on_D(D_CV_LED);
-    else
-      pin_off_D(D_CV_LED);
+    if (state) {
+      // Set DAC output to 51mV.
+      twi_send_16_bit(DAC_ADDR, 42);
+    }
   }
 }
 
 
 //
-// TWI / DAC
+// TWI
 //
 
 enum Twi_State {
@@ -328,22 +343,120 @@ enum Twi_State {
 };
 
 ISR (TWI_vect) {
-  // TODO: check status, change state
+  uint8_t status = TWSR & 0b11111000;
+# define TWI_STATUS_STARTED 0x08
+# define TWI_STATUS_SLAVE_W_ACK 0x18
+# define TWI_STATUS_SLAVE_W_NACK 0x20
+# define TWI_STATUS_DATA_ACK 0x28
+# define TWI_STATUS_DATA_NACK 0x30
+# define TWI_STATUS_SLAVE_LOST 0x38
+  switch (get_data_H_n(H_twi, TWI_STATE)) {
+    case TS_idle:
+      twi_acknowledge_interrupt();
+      break;
+    case TS_starting:
+      if (status != TWI_STATUS_STARTED)
+        twi_abort_with_error(S_twi_start_failed);
+      else {
+        twi_addr_w();
+      }
+      break;
+    case TS_addressing:
+      if (status != TWI_STATUS_SLAVE_W_ACK)
+        twi_abort_with_error(S_twi_slave_not_ready);
+      else {
+        twi_first_byte();
+      }
+      break;
+    case TS_sending_0:
+      if (status != TWI_STATUS_DATA_ACK)
+        twi_abort_with_error(S_twi_slave_not_ready);
+      else {
+        twi_next_byte();
+      }
+      break;
+    case TS_sending_1:
+      if (status != TWI_STATUS_DATA_ACK)
+        twi_abort_with_error(S_twi_slave_not_ready);
+      else {
+        twi_next_byte();
+      }
+      break;
+    case TS_sending_2:
+      if (status != TWI_STATUS_DATA_ACK)
+        twi_abort_with_error(S_twi_slave_not_ready);
+      else {
+        twi_next_byte();
+      }
+      break;
+    case TS_sending_3:
+      if (status != TWI_STATUS_DATA_ACK)
+        twi_abort_with_error(S_twi_slave_not_ready);
+      else {
+        twi_next_byte();
+      }
+      break;
+  }
+}
+
+void twi_abort_with_error (uint8_t error) {
+  set_status_H_S(H_twi, error);
+  twi_stop();
 }
 
 void h_twi () {
   // TODO:
 }
 
-common twi_send_16_bit (uint8_t slave, uint16_t value) {
-  if (get_data_H_n(H_twi, TWI_STATE) != TS_idle) {
-    return FAIL;
-  }
+return_t twi_send_16_bit (uint8_t slave, uint16_t value) {
+  if (get_data_H_n(H_twi, TWI_STATE) != TS_idle)
+    return BUSY;
   set_data_H_n_b(H_twi, TWI_SLAVE_ADDR, slave);
   set_data_H_n_b(H_twi, TWI_BYTES_N, 2);
   set_data_H_n_b(H_twi, TWI_BYTE_ARRAY, (value >> 8));
   set_data_H_n_b(H_twi, TWI_BYTE_ARRAY+1, (value & 0xFF));
+  twi_start();
   return SUCCESS;
+}
+
+void twi_start (void) {
+  set_data_H_n_b(H_twi, TWI_STATE, TS_starting);
+  TWCR = _BV(TWINT) | _BV(TWSTA) | _BV(TWEN) | _BV(TWIE);
+}
+
+void twi_addr_w (void) {
+  set_data_H_n_b(H_twi, TWI_STATE, TS_addressing);
+  TWDR = get_data_H_n(H_twi, TWI_SLAVE_ADDR) << 1;  // Bit 0 means R/~W
+  twi_acknowledge_interrupt();
+}
+
+void twi_first_byte (void) {
+  uint8_t bytes_total = get_data_H_n(H_twi, TWI_BYTES_N);
+  if (bytes_total == 0) {
+    return twi_stop();
+  }
+  set_data_H_n_b(H_twi, TWI_STATE, TS_sending_0);
+  TWDR = get_data_H_n(H_twi, TWI_BYTE_ARRAY);
+  twi_acknowledge_interrupt();
+}
+
+void twi_next_byte (void) {
+  uint8_t bytes_total = get_data_H_n(H_twi, TWI_BYTES_N);
+  uint8_t next_index = get_data_H_n(H_twi, TWI_STATE) + 1;
+  if (next_index >= bytes_total)
+    return twi_stop();
+  set_data_H_n_b(H_twi, TWI_STATE, next_index);
+  TWDR = get_data_H_n(H_twi, TWI_BYTE_ARRAY+next_index);
+  twi_acknowledge_interrupt();
+}
+
+void twi_stop (void) {
+  set_data_H_n_b(H_twi, TWI_STATE, TS_idle);
+  TWCR = _BV(TWINT) | _BV(TWSTO) | _BV(TWEN);
+}
+
+void twi_acknowledge_interrupt (void) {
+  TWCR = _BV(TWINT) | _BV(TWEN) | _BV(TWIE);
 }
 
 void setup_twi_normal_speed_master_transfer (void) {
@@ -352,6 +465,8 @@ void setup_twi_normal_speed_master_transfer (void) {
   TWSR |= 0b01;  // Divide by 4
   // Start idle.
   set_data_H_n_b(H_twi, TWI_STATE, TS_idle);
+  // Take control of pins and use interrupts.
+  TWCR = _BV(TWEN) | _BV(TWIE);
 }
 
 //
