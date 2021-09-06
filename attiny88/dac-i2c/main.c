@@ -6,6 +6,7 @@
 // LEDs on PDx.
 // DAC on PC4/5.
 
+// When button is pushed, the DAC changes to max output.
 
 //  PD6 --- +LED(R)- --- GND
 #define D_CC_LED PD6
@@ -14,7 +15,6 @@
 #define D_CV_LED PD7
 
 // PB2 --- SW_PUSH --- GND
-// PD2 --- SW_PUSH --- GND
 #define B_OE_SW PB2
 
 // PC4 --- SDA:MCP4725
@@ -106,22 +106,15 @@ INLINE return_t twi_send_16_bit (uint8_t slave, uint16_t value);
 INLINE return_t twi_send_32_bit (uint8_t slave, uint32_t value);
 INLINE void twi_first_byte (void);
 INLINE void twi_next_byte (void);
-INLINE void twi_stop (void);
-INLINE void twi_acknowledge_interrupt (void);
+INLINE void twi_continue (void);
+INLINE void twi_abort_with_error (uint8_t error);
 
-void twi_abort_with_error (uint8_t error);
+void twi_stop (void);
 
 // Functions tied to specific Intr_Handlers.
 void unknown_error (void);
 void h_button (void);
 void h_twi (void);
-
-# define TWI_MAX_BYTES_N 4
-# define TWI_STATE 1
-# define TWI_SLAVE_ADDR 2
-# define TWI_BYTES_N 3
-# define TWI_BYTE_ARRAY 4
-
 
 int main () {
   init_intr_handler_tables();
@@ -321,8 +314,8 @@ void h_button (void) {
   sei();
   if (status == S_processing_needed) {
     if (state) {
-      // Set DAC output to 0V.
-      twi_send_16_bit(DAC_ADDR, 0);
+      // Set DAC output to max output (5V).
+      twi_send_16_bit(DAC_ADDR, 0b111111111111);
     }
   }
 }
@@ -338,46 +331,17 @@ enum Twi_State {
   TS_sending_1,
   TS_sending_2,
   TS_sending_3,
-  // The remaining values are unimportant:
+  // ... etc
+  // The remaining exact values are unimportant:
   TS_addressing,
   TS_starting,
   TS_idle,
 };
 
-ISR (TWI_vect) {
-  uint8_t status = TWSR & 0b11111000;
-# define TWI_STATUS_STARTED 0x08
-# define TWI_STATUS_SLAVE_W_ACK 0x18
-# define TWI_STATUS_SLAVE_W_NACK 0x20
-# define TWI_STATUS_DATA_ACK 0x28
-# define TWI_STATUS_DATA_NACK 0x30
-# define TWI_STATUS_SLAVE_LOST 0x38
-  switch (get_data_H_n(H_twi, TWI_STATE)) {
-    case TS_idle:
-      return twi_acknowledge_interrupt();
-    case TS_starting:
-      if (status != TWI_STATUS_STARTED)
-        return twi_abort_with_error(S_twi_start_failed);
-      return twi_addr_w();
-    case TS_addressing:
-      if (status != TWI_STATUS_SLAVE_W_ACK)
-        return twi_abort_with_error(S_twi_slave_not_ready);
-      return twi_first_byte();
-  }
-  // All other sending states behave the same:
-  if (status != TWI_STATUS_DATA_ACK)
-    return twi_abort_with_error(S_twi_slave_not_ready);
-  return twi_next_byte();
-}
-
-void twi_abort_with_error (uint8_t error) {
-  set_status_H_S(H_twi, error);
-  twi_stop();
-}
-
-void h_twi () {
-  // TODO:
-}
+# define TWI_STATE 1
+# define TWI_SLAVE_ADDR 2
+# define TWI_BYTES_N 3
+# define TWI_BYTE_ARRAY 4
 
 return_t twi_send_8_bit (uint8_t slave, uint8_t value) {
   if (get_data_H_n(H_twi, TWI_STATE) != TS_idle)
@@ -413,6 +377,36 @@ return_t twi_send_32_bit (uint8_t slave, uint32_t value) {
   return SUCCESS;
 }
 
+ISR (TWI_vect) {
+  uint8_t status = TWSR & 0b11111000;
+# define TWI_STATUS_STARTED 0x08
+# define TWI_STATUS_SLAVE_W_ACK 0x18
+# define TWI_STATUS_SLAVE_W_NACK 0x20
+# define TWI_STATUS_DATA_ACK 0x28
+# define TWI_STATUS_DATA_NACK 0x30
+# define TWI_STATUS_SLAVE_LOST 0x38
+  switch (get_data_H_n(H_twi, TWI_STATE)) {
+    case TS_idle:
+      return twi_continue();
+    case TS_starting:
+      if (status != TWI_STATUS_STARTED)
+        return twi_abort_with_error(S_twi_start_failed);
+      return twi_addr_w();
+    case TS_addressing:
+      if (status != TWI_STATUS_SLAVE_W_ACK)
+        return twi_abort_with_error(S_twi_slave_not_ready);
+      return twi_first_byte();
+  }
+  // All other sending states behave the same:
+  if (status != TWI_STATUS_DATA_ACK)
+    return twi_abort_with_error(S_twi_slave_not_ready);
+  return twi_next_byte();
+}
+
+void h_twi () {
+  // Not used, but the attached data is.
+}
+
 void twi_start (void) {
   set_data_H_n_b(H_twi, TWI_STATE, TS_starting);
   // Start & use interrupts.
@@ -422,7 +416,7 @@ void twi_start (void) {
 void twi_addr_w (void) {
   set_data_H_n_b(H_twi, TWI_STATE, TS_addressing);
   TWDR = get_data_H_n(H_twi, TWI_SLAVE_ADDR) << 1;  // Bit 0 means R/~W
-  twi_acknowledge_interrupt();
+  twi_continue();
 }
 
 void twi_first_byte (void) {
@@ -432,7 +426,7 @@ void twi_first_byte (void) {
   }
   set_data_H_n_b(H_twi, TWI_STATE, TS_sending_0);
   TWDR = get_data_H_n(H_twi, TWI_BYTE_ARRAY);
-  twi_acknowledge_interrupt();
+  twi_continue();
 }
 
 void twi_next_byte (void) {
@@ -442,7 +436,7 @@ void twi_next_byte (void) {
     return twi_stop();
   set_data_H_n_b(H_twi, TWI_STATE, next_index);
   TWDR = get_data_H_n(H_twi, TWI_BYTE_ARRAY+next_index);
-  twi_acknowledge_interrupt();
+  twi_continue();
 }
 
 void twi_stop (void) {
@@ -450,7 +444,12 @@ void twi_stop (void) {
   TWCR = _BV(TWINT) | _BV(TWSTO) | _BV(TWEN);
 }
 
-void twi_acknowledge_interrupt (void) {
+void twi_abort_with_error (uint8_t error) {
+  set_status_H_S(H_twi, error);
+  twi_stop();
+}
+
+void twi_continue (void) {
   TWCR = _BV(TWINT) | _BV(TWEN) | _BV(TWIE);
 }
 
