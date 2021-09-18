@@ -344,7 +344,7 @@ void h_button (void) {
 #define ADC_CURRENT_READING 5
 
 void adc_setup (void) {
-  //adc_use_channels_6_7();
+  adc_use_channels_6_7();
   adc_voltage_high();
   adc_free_running_interrupt_at_125kHz();    
 }
