@@ -105,7 +105,6 @@ INLINE void adc_free_running_interrupt_at_125kHz (void);
 INLINE void adc_current_high (void);
 INLINE void adc_current_low (void);INLINE void adc_voltage_high (void);
 INLINE void adc_voltage_low (void);
-INLINE void adc_temperature (void);
 INLINE void adc_effectuate_channel_and_ref (void);
 INLINE void adc_use_channels_6_7 (void);
 
@@ -221,8 +220,8 @@ void init_button_handler (uint8_t handler) {
 }
 
 void init_adc_handler (uint8_t handler) {
-  // Status byte, channel, conversion to skip, array of readings (2 * (V + I + Temp))
-  intr_handler_data_layout_H[handler] = 3 + 2 * 3;
+  // Status byte, channel, conversion to skip, array of readings (2 * (V + I))
+  intr_handler_data_layout_H[handler] = 3 + 2 * 2;
   intr_handler_H[handler] = h_adc;
 }
 
@@ -337,14 +336,12 @@ void h_button (void) {
 // TEM = ADC8 = 1000
 #define ADC_CURRENT_PORT 6
 #define ADC_VOLTAGE_PORT 7
-#define ADC_TEMPERATURE_PORT 8
 
 // Storage layout
 #define ADC_CHANNEL_AND_REF 1
 #define ADC_READINGS_TO_SKIP 2
 #define ADC_VOLTAGE_READING 3
 #define ADC_CURRENT_READING 5
-#define ADC_TEMPERATURE_READING 7
 
 void adc_setup (void) {
   //adc_use_channels_6_7();
@@ -380,11 +377,6 @@ void adc_voltage_low (void) {
   adc_effectuate_channel_and_ref();
 }
 
-void adc_temperature (void) {
-  set_data_H_n_b(H_adc, ADC_CHANNEL_AND_REF, ADC_TEMPERATURE_PORT);
-  adc_effectuate_channel_and_ref();
-}
-
 void adc_effectuate_channel_and_ref (void) {
   ADMUX = get_b_data_H_n(H_adc, ADC_CHANNEL_AND_REF);
   set_data_H_n_b(H_adc, ADC_READINGS_TO_SKIP, 1);
@@ -407,16 +399,9 @@ ISR (ADC_vect) {
   else if (channel == ADC_CURRENT_PORT) {
     set_data_H_n_w(H_adc, ADC_CURRENT_READING, reading);
     adc_voltage_high();
-    // adc_temperature();
-  }
-  else if (channel == ADC_TEMPERATURE_PORT) {
-    set_data_H_n_w(H_adc, ADC_TEMPERATURE_READING, reading);
-    adc_voltage_high();
   }
   else {
-    //  return set_status_H_S(H_adc, S_adc_test);
-
-    //return set_status_H_S(H_adc, S_adc_unknown);
+    return set_status_H_S(H_adc, S_adc_unknown);
   }
   set_status_H_S(H_adc, S_processing_needed);
 }
@@ -426,7 +411,6 @@ void h_adc () {
   uint8_t status = get_status_H(H_adc);
   uint16_t current = get_w_data_H_n(H_adc, ADC_CURRENT_READING);
   uint16_t voltage = get_w_data_H_n(H_adc, ADC_VOLTAGE_READING);
-  // uint16_t temperature = get_w_data_H_n(H_adc, ADC_TEMPERATURE_READING);
   if (status == S_processing_needed) 
     set_status_H_S(H_adc, S_ok);
   sei();
