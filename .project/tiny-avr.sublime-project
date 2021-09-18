@@ -26,6 +26,9 @@
       , { "name": "dac-i2c"
         , "working_dir": "${project_path}/../attiny88/dac-i2c"
         }
+      , { "name": "adc-builtin"
+        , "working_dir": "${project_path}/../attiny88/adc-builtin"
+        }
       ]
     }
   ]

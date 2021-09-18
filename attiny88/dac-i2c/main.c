@@ -123,6 +123,7 @@ int main () {
   setup_twi_normal_speed_master_transfer();
   sanity_check();
   sei();
+  twi_send_16_bit(DAC_ADDR, 0);
   while (1) {
     while (error_present()) {
       show_all_errors();

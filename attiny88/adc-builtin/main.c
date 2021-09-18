@@ -6,7 +6,9 @@
 // LEDs on PDx.
 // ADC on PC0/1.
 
-// When button is pushed, ...
+// When A_I_SENSE is over half of the input range (0x1FF), then the red LED is on.
+// When A_V_SENSE is over half of the input range (0x1FF), then the gree LED is on.
+// When button is pushed, TODO: the ADC reference changes to 1.1V
 
 //  PD6 --- +LED(R)- --- GND
 #define D_CC_LED PD6
@@ -46,6 +48,7 @@ enum Status {
   S_unknown_error = 3,
   // ADC errors.
   S_adc_unknown = 4,
+  S_adc_test = 5,
 };
 
 enum Intr_Handler {
@@ -60,7 +63,7 @@ uint8_t intr_handler_data_layout_H [N_INTR_HANDLERS];
 uint8_t intr_handler_to_data_index_H [N_INTR_HANDLERS];
 
 // Has to match (or exceed) number of bytes reserved for all interrupt handlers.
-#define N_INTR_TOTAL_BYTES 11
+#define N_INTR_TOTAL_BYTES 14
 uint8_t intr_handler_data [N_INTR_TOTAL_BYTES];
 
 typedef void (*handler_t)(void);
@@ -77,8 +80,10 @@ INLINE void ui_init (void);
 INLINE void init_intr_handler_tables (void);
 INLINE void set_status_H_S (uint8_t handler, uint8_t status);
 INLINE void set_data_H_n_b (uint8_t handler, uint8_t index, uint8_t data);
+INLINE void set_data_H_n_w (uint8_t handler, uint8_t index, uint16_t data);
 INLINE uint8_t get_status_H (uint8_t handler);
-INLINE uint8_t get_data_H_n (uint8_t handler, uint8_t index);
+INLINE uint8_t get_b_data_H_n (uint8_t handler, uint8_t index);
+INLINE uint16_t get_w_data_H_n (uint8_t handler, uint8_t index);
 INLINE void init_intr_handler_data (void);
 INLINE void sanity_check (void);
 INLINE bool error_present (void);
@@ -94,6 +99,15 @@ INLINE void enable_interrupt_from_buttons (void);
 INLINE void pcint_7_to_0_generate_interrupt_on_pci0 (void);
 INLINE void init_sanity_handler (uint8_t handler);
 INLINE void init_button_handler (uint8_t handler);
+INLINE void init_adc_handler (uint8_t handler);
+INLINE void adc_setup (void);
+INLINE void adc_free_running_interrupt_at_125kHz (void);
+INLINE void adc_current_high (void);
+INLINE void adc_current_low (void);INLINE void adc_voltage_high (void);
+INLINE void adc_voltage_low (void);
+INLINE void adc_temperature (void);
+INLINE void adc_effectuate_channel_and_ref (void);
+INLINE void adc_use_channels_6_7 (void);
 
 
 // Functions tied to specific Intr_Handlers.
@@ -105,11 +119,10 @@ int main () {
   init_intr_handler_tables();
   ui_init();
   setup_irq_on_button();
-  setup_adc();
+  adc_setup();
   sanity_check();
   sei();
-  while (1) {
-    while (error_present()) {
+  while (1) {    while (error_present()) {
       show_all_errors();
       _delay_ms(LONG_BLINK_ms);
     }
@@ -187,7 +200,7 @@ void sanity_check (void) {
 void init_intr_handler_tables (void) {
   init_sanity_handler(H_sanity);
   init_button_handler(H_button);
-  init_adc_handler(H_twi);
+  init_adc_handler(H_adc);
   init_intr_handler_data();
 };
 
@@ -208,8 +221,8 @@ void init_button_handler (uint8_t handler) {
 }
 
 void init_adc_handler (uint8_t handler) {
-  // Status byte, channel, conversion to skip, array of readings (V + I + Temp)
-  intr_handler_data_layout_H[handler] = 6;
+  // Status byte, channel, conversion to skip, array of readings (2 * (V + I + Temp))
+  intr_handler_data_layout_H[handler] = 3 + 2 * 3;
   intr_handler_H[handler] = h_adc;
 }
 
@@ -231,12 +244,22 @@ void set_data_H_n_b (uint8_t handler, uint8_t index, uint8_t data) {
   intr_handler_data[intr_handler_to_data_index_H[handler]+index] = data;
 }
 
-uint8_t get_status_H (uint8_t handler) {
-  return get_data_H_n(handler, 0);
+void set_data_H_n_w (uint8_t handler, uint8_t index, uint16_t data) {
+  intr_handler_data[intr_handler_to_data_index_H[handler]+index] = data & 0xFF;
+  intr_handler_data[intr_handler_to_data_index_H[handler]+index+1] = data >> 8;
 }
 
-uint8_t get_data_H_n (uint8_t handler, uint8_t index) {
+uint8_t get_status_H (uint8_t handler) {
+  return get_b_data_H_n(handler, 0);
+}
+
+uint8_t get_b_data_H_n (uint8_t handler, uint8_t index) {
   return intr_handler_data[intr_handler_to_data_index_H[handler]+index];
+}
+
+uint16_t get_w_data_H_n (uint8_t handler, uint8_t index) {
+  return intr_handler_data[intr_handler_to_data_index_H[handler]+index] |
+    intr_handler_data[intr_handler_to_data_index_H[handler]+index+1] << 8;
 }
 
 void ui_init (void) {
@@ -293,14 +316,13 @@ void h_button (void) {
   uint8_t state;
   cli();
   status = get_status_H(H_button);
-  state = get_data_H_n(H_button, 1);
+  state = get_b_data_H_n(H_button, 1);
   set_status_H_S(H_button, S_ok);
   set_data_H_n_b(H_button, 1, 0x00);
   sei();
   if (status == S_processing_needed) {
     if (state) {
-      // Set DAC output to max output (5V).
-      //twi_send_16_bit(DAC_ADDR, 0b111111111111);
+      return set_status_H_S(H_adc, S_adc_test);
     }
   }
 }
@@ -310,23 +332,112 @@ void h_button (void) {
 // ADC
 //
 
-#define ADC_CHANNEL 1
-#define ADC_TO_SKIP 2
-#define ADC_READING_ARRAY 3
+// PA0 = ADC6 = 0110
+// PA1 = ADC7 = 0111
+// TEM = ADC8 = 1000
+#define ADC_CURRENT_PORT 6
+#define ADC_VOLTAGE_PORT 7
+#define ADC_TEMPERATURE_PORT 8
 
-#define ADC_CHANNEL_I_SENSE 0b0110
-#define ADC_CHANNEL_V_SENSE 0b0111
-#define ADC_CHANNEL_TEMPERATURE 0b1000
+// Storage layout
+#define ADC_CHANNEL_AND_REF 1
+#define ADC_READINGS_TO_SKIP 2
+#define ADC_VOLTAGE_READING 3
+#define ADC_CURRENT_READING 5
+#define ADC_TEMPERATURE_READING 7
 
-void start_free_running_interrupt_adc_at_125kHz (void) {
-  set_data_H_n_b(H_adc, ADC_CHANNEL, ADC_CHANNEL_V_SENSE);
-  ADCSRA = _BV(ADEN) | _BV(ADSC) | _BV(ADIE) | _BV(ADPS2) | _BV(ADPS1);
+void adc_setup (void) {
+  //adc_use_channels_6_7();
+  adc_voltage_high();
+  adc_free_running_interrupt_at_125kHz();    
+}
+
+void adc_use_channels_6_7 (void) {
+  DIDR0 = _BV(ADC7D) | _BV(ADC6D);
+}
+
+void adc_free_running_interrupt_at_125kHz (void) {
+  ADCSRA = _BV(ADEN) | _BV(ADSC) | _BV(ADATE) | _BV(ADIE) | _BV(ADPS2) | _BV(ADPS1);
+}
+
+void adc_current_high (void) {
+  set_data_H_n_b(H_adc, ADC_CHANNEL_AND_REF, _BV(REFS0) | ADC_CURRENT_PORT);
+  adc_effectuate_channel_and_ref();
+}
+
+void adc_current_low (void) {
+  set_data_H_n_b(H_adc, ADC_CHANNEL_AND_REF, ADC_CURRENT_PORT);
+  adc_effectuate_channel_and_ref();
+}
+
+void adc_voltage_high (void) {
+  set_data_H_n_b(H_adc, ADC_CHANNEL_AND_REF, _BV(REFS0) | ADC_VOLTAGE_PORT);
+  adc_effectuate_channel_and_ref();
+}
+
+void adc_voltage_low (void) {
+  set_data_H_n_b(H_adc, ADC_CHANNEL_AND_REF, ADC_VOLTAGE_PORT);
+  adc_effectuate_channel_and_ref();
+}
+
+void adc_temperature (void) {
+  set_data_H_n_b(H_adc, ADC_CHANNEL_AND_REF, ADC_TEMPERATURE_PORT);
+  adc_effectuate_channel_and_ref();
+}
+
+void adc_effectuate_channel_and_ref (void) {
+  ADMUX = get_b_data_H_n(H_adc, ADC_CHANNEL_AND_REF);
+  set_data_H_n_b(H_adc, ADC_READINGS_TO_SKIP, 1);
 }
 
 ISR (ADC_vect) {
-  // TODO:
+  uint8_t reading_l = ADCL;
+  uint8_t reading_h = ADCH;
+  uint8_t readings_to_skip = get_b_data_H_n(H_adc, ADC_READINGS_TO_SKIP);
+  if (readings_to_skip > 0) {
+    return set_data_H_n_b(H_adc, ADC_READINGS_TO_SKIP, readings_to_skip - 1);
+  }
+  uint16_t reading = reading_h << 8 | reading_l;
+  uint8_t channel_and_ref = get_b_data_H_n(H_adc, ADC_CHANNEL_AND_REF);
+  uint8_t channel = channel_and_ref & 0b111;
+  if (channel == ADC_VOLTAGE_PORT) {
+    set_data_H_n_w(H_adc, ADC_VOLTAGE_READING, reading);
+    adc_current_high();
+  }
+  else if (channel == ADC_CURRENT_PORT) {
+    set_data_H_n_w(H_adc, ADC_CURRENT_READING, reading);
+    adc_voltage_high();
+    // adc_temperature();
+  }
+  else if (channel == ADC_TEMPERATURE_PORT) {
+    set_data_H_n_w(H_adc, ADC_TEMPERATURE_READING, reading);
+    adc_voltage_high();
+  }
+  else {
+    //  return set_status_H_S(H_adc, S_adc_test);
+
+    //return set_status_H_S(H_adc, S_adc_unknown);
+  }
+  set_status_H_S(H_adc, S_processing_needed);
 }
 
 void h_adc () {
-  // TODO:
+  cli();
+  uint8_t status = get_status_H(H_adc);
+  uint16_t current = get_w_data_H_n(H_adc, ADC_CURRENT_READING);
+  uint16_t voltage = get_w_data_H_n(H_adc, ADC_VOLTAGE_READING);
+  // uint16_t temperature = get_w_data_H_n(H_adc, ADC_TEMPERATURE_READING);
+  if (status == S_processing_needed) 
+    set_status_H_S(H_adc, S_ok);
+  sei();
+  if (status != S_processing_needed) 
+    return;
+  if (current > 0x1FF)
+    pin_on_D(D_CC_LED);
+  else
+    pin_off_D(D_CC_LED);
+  if (voltage > 0x1FF)
+    pin_on_D(D_CV_LED);
+  else
+    pin_off_D(D_CV_LED);
 }

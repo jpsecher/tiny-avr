@@ -26,7 +26,7 @@ To communicate with the programmer, install avrdude:
 
 Check that communication works:
 
-    $ avrdude -c avrispmkii -p t10
+    $ avrdude -c avrispmkii -p t88
 
 The LED on the programmer should change from orange to green light.
 
