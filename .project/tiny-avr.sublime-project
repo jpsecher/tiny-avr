@@ -5,29 +5,32 @@
     , "syntax": "Packages/ANSIescape/ANSI.tmLanguage"
     , "cmd": "make"
     , "variants":
-      [ { "name": "irq-time"
+      [ { "name": "t88 irq-time"
         , "working_dir": "${project_path}/../irq-time"
         }
-      , { "name": "irq-button"
+      , { "name": "t88 irq-button"
         , "working_dir": "${project_path}/../irq-button"
         }
-      , { "name": "blink-error-loop"
+      , { "name": "t88 blink-error-loop"
         , "working_dir": "${project_path}/../attiny88/blink-error-loop"
         }
-      , { "name": "encoder"
+      , { "name": "t88 encoder"
         , "working_dir": "${project_path}/../attiny88/encoder"
         }
-      , { "name": "lab-psu"
+      , { "name": "t88 lab-psu"
         , "working_dir": "${project_path}/../attiny88/lab-psu"
         }
-      , { "name": "lcd"
+      , { "name": "t88 lcd"
         , "working_dir": "${project_path}/../attiny88/lcd"
         }
-      , { "name": "dac-i2c"
+      , { "name": "t88 dac-i2c"
         , "working_dir": "${project_path}/../attiny88/dac-i2c"
         }
-      , { "name": "adc-builtin"
+      , { "name": "t88 adc-builtin"
         , "working_dir": "${project_path}/../attiny88/adc-builtin"
+        }
+      , { "name": "t88 blinky"
+        , "working_dir": "${project_path}/../attiny88/blinky"
         }
       ]
     }

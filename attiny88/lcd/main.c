@@ -93,10 +93,12 @@ int main (void) {
   lcd_create_oe();
   lcd_create_ae();
   lcd_setCursor(0, 0);
-  lcd_print("  Du er l\2kker");
+  //lcd_print("  Du er l\2kker");
+  lcd_print("   Du er s\1d");
   lcd_setCursor(0, 1);
-  lcd_print("    og s\1d");
-  lcd_setCursor(11, 1);
+  //lcd_print("    og s\1d");
+  lcd_print("   og l\2kker");
+  lcd_setCursor(13, 0);
   lcd_write(0);
   lcd_setCursor(15, 1);
   while (1) {

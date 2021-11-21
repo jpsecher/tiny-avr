@@ -8,8 +8,11 @@
 //
 // This demo will signal two errors when the button is pressed.   The error
 // codes are displayed in binary by 0 as short green blink and 1 as long green
-// blink, LSB first.  Between errors, a long red blink will occur.
+// blink, LSB first (ie. reversed).  Between errors, a long red blink will
+// occur.
 //
+// The simulated errors are error code 2 (=> 0,1 binary LSB first) and error code 3 (=>
+// 1,1 binary LSB first).
 
 
 //

@@ -21,7 +21,7 @@
 // PC5 --- SCL:MCP4725
 #define C_SDA PC4
 #define C_SCL PC5
-#define DAC_ADDR 0b1100000
+#define DAC_ADDR 0b1100000  // Default with A0 to GND
 
 
 #define F_CPU 8000000
@@ -218,7 +218,7 @@ void unknown_error (void) {
 }
 
 void init_button_handler (uint8_t handler) {
-  // Status byte and a bytes for the button (1 bit).
+  // Status byte and a byte for the button (1 bit).
   intr_handler_data_layout_H[handler] = 2;
   intr_handler_H[handler] = h_button;
 }
