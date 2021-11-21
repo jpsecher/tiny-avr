@@ -33,18 +33,23 @@ INLINE void pcint_7_to_0_generate_interrupt_on_pci0 (void);
 INLINE void enable_interrupt_from_encoder (void);
 INLINE void translate_encoder (bool a, bool b);
 
-bool a;
-bool b;
+bool I_a;
+bool I_b;
 
 ISR (PCINT0_vect) {
-  a = bit_is_set(PINB, B_V_ENC_A);
-  b = bit_is_set(PINB, B_V_ENC_B);
+  uint8_t pins = _SFR_BYTE(PINB);
+  I_a = pins & _BV(B_V_ENC_A);
+  I_b = pins & _BV(B_V_ENC_B);
 }
 
 int main () {
   ui_init();
   setup_irq_on_encoder();
   while (1) {
+    cli();
+    bool a = I_a;
+    bool b = I_b;
+    sei();
     translate_encoder(a, b);
   }
   return 0;
@@ -88,7 +93,7 @@ void translate_encoder (bool a, bool b) {
     pin_on_D(D_CC_LED);
   else
     pin_off_D(D_CC_LED);
-  _delay_ms(5);
+  _delay_ms(2);
 }
 
 void ui_init (void) {
